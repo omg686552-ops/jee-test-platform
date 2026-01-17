@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraTest - JEE Advanced Series</title>
+    
+    <!-- React & DOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            950: '#020617',
+                        }
+                    },
+                    animation: {
+                        'spin-slow': 'spin 3s linear infinite',
+                        'pulse-soft': 'pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        'pulse-soft': {
+                            '0%, 100%': { opacity: 1 },
+                            '50%': { opacity: 0.7 },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617; /* Slate 950 */
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0f172a; 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #475569; 
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+    </style>
+
+    <!-- FIREBASE INITIALIZATION MODULE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            createUserWithEmailAndPassword, 
+            signOut, 
+            onAuthStateChanged,
+            signInWithCustomToken
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import {
+            getFirestore,
+            collection,
+            addDoc,
+            getDocs,
+            onSnapshot,
+            query,
+            orderBy
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variable to access firebase from React
+        window.AppFirebase = {};
+
+        // --- YOUR FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAH-Lm5oeYHghir9tK2htaYoj4aRvjqHvA",
+            authDomain: "auratest-142d7.firebaseapp.com",
+            projectId: "auratest-142d7",
+            storageBucket: "auratest-142d7.firebasestorage.app",
+            messagingSenderId: "842097709722",
+            appId: "1:842097709722:web:f6bab7e2f825e0aa9b8523",
+            measurementId: "G-KEVMCVDLKE"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+            
+            // Expose functions to window for React to use
+            window.AppFirebase = {
+                auth,
+                db,
+                signIn: signInWithEmailAndPassword,
+                signUp: createUserWithEmailAndPassword,
+                logout: signOut,
+                onAuthChange: onAuthStateChanged,
+                initAuth: async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        try {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } catch (e) {
+                            console.log("Environment token skipped (Custom project detected). Please log in manually.");
+                        }
+                    } 
+                },
+                // Firestore Helpers
+                collection,
+                addDoc,
+                onSnapshot,
+                query,
+                orderBy,
+                getDocs
+            };
+            
+            window.AppFirebase.initAuth();
+            
+        } catch (error) {
+            console.error("Firebase Initialization Error:", error);
+            alert("Failed to initialize Firebase. Check console for details.");
+        }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+        
+        // --- ADMIN CONFIGURATION ---
+        // 1. Run the app and check the Console.
+        // 2. Copy the "YOUR USER ID" string.
+        // 3. Paste it below to become the Admin.
+        const ADMIN_UID = "XZ3MBiY8gdU7r6UexqFSX0t1SiI3"; 
+
+        // --- GLOBAL APP ID FOR FIRESTORE PATHS ---
+        const APP_ID = "auratest_v1";
+
+        // --- ICONS ---
+        const Icon = ({ path, className, size = 24 }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{path}</svg>
+        );
+
+        const Icons = {
+            Clock: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>} />,
+            CheckCircle: (p) => <Icon {...p} path={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>} />,
+            XCircle: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></>} />,
+            AlertCircle: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>} />,
+            ChevronRight: (p) => <Icon {...p} path={<polyline points="9 18 15 12 9 6"/>} />,
+            ChevronLeft: (p) => <Icon {...p} path={<polyline points="15 18 9 12 15 6"/>} />,
+            Upload: (p) => <Icon {...p} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>} />,
+            BookOpen: (p) => <Icon {...p} path={<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>} />,
+            Cpu: (p) => <Icon {...p} path={<><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></>} />,
+            Zap: (p) => <Icon {...p} path={<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>} />,
+            Award: (p) => <Icon {...p} path={<><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></>} />,
+            LogOut: (p) => <Icon {...p} path={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>} />,
+            LayoutGrid: (p) => <Icon {...p} path={<><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>} />,
+            User: (p) => <Icon {...p} path={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>} />,
+            Settings: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></>} />,
+            Menu: (p) => <Icon {...p} path={<><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>} />,
+            FileText: (p) => <Icon {...p} path={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>} />,
+            Loader: (p) => <Icon {...p} path={<><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></>} />,
+            Mail: (p) => <Icon {...p} path={<><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></>} />,
+            Lock: (p) => <Icon {...p} path={<><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>} />,
+            ArrowRight: (p) => <Icon {...p} path={<><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>} />,
+        };
+
+        const INITIAL_TEST_DATA = {
+            id: "jee-mains-mock-demo",
+            title: "JEE Mains Demo (Default)",
+            duration: 180, 
+            totalMarks: 300,
+            subjects: ["Physics", "Chemistry", "Mathematics"],
+            questions: [
+                { id: 1, subject: "Physics", type: "MCQ", text: "A particle moves with simple harmonic motion in a straight line. In first τ s, after starting from rest it travels a distance a, and in next τ s it travels 2a, in same direction, then:", options: ["Amplitude of motion is 3a", "Time period of oscillations is 8τ", "Amplitude of motion is 4a", "Time period of oscillations is 6τ"], correct: 3 },
+                { id: 2, subject: "Physics", type: "MCQ", text: "Two long current carrying parallel conductors are located at a distance 2d from each other. They carry current I in opposite directions. The magnetic field at a point midway between them is:", options: ["0", "μ₀I / πd", "μ₀I / 2πd", "2μ₀I / πd"], correct: 1 },
+                { id: 3, subject: "Physics", type: "NUMERIC", text: "A capacitor of capacitance C = 900 pF is charged fully by 100 V battery B. Then it is disconnected from the battery and connected to another uncharged capacitor of capacitance C = 900 pF. The electrostatic energy stored by the system (in μJ) is:", correct: 2.25 },
+                { id: 4, subject: "Chemistry", type: "MCQ", text: "Which of the following sets of quantum numbers is NOT permissible?", options: ["n=2, l=0, m=0, s=+1/2", "n=2, l=2, m=1, s=-1/2", "n=3, l=2, m=-2, s=+1/2", "n=3, l=1, m=-1, s=-1/2"], correct: 1 },
+                { id: 5, subject: "Chemistry", type: "MCQ", text: "The correct order of increasing thermal stability of K2CO3, MgCO3, CaCO3 and BeCO3 is:", options: ["BeCO3 < MgCO3 < K2CO3 < CaCO3", "BeCO3 < MgCO3 < CaCO3 < K2CO3", "MgCO3 < BeCO3 < CaCO3 < K2CO3", "K2CO3 < MgCO3 < CaCO3 < BeCO3"], correct: 1 },
+                { id: 6, subject: "Chemistry", type: "NUMERIC", text: "How many grams of methyl alcohol should be added to 10 liters of water to lower its freezing point by 10°C? (Kf for water is 1.86°C kg/mol). Answer to nearest integer.", correct: 1720 },
+                { id: 7, subject: "Mathematics", type: "MCQ", text: "If the system of linear equations x + y + z = 5, x + 2y + 3z = 9, x + 3y + αz = β has infinitely many solutions, then β - α equals:", options: ["5", "18", "21", "8"], correct: 3 },
+                { id: 8, subject: "Mathematics", type: "MCQ", text: "The number of integral values of k for which the line 3x + 4y = k intersects the circle x² + y² - 2x - 4y + 4 = 0 at two distinct points is:", options: ["7", "8", "9", "5"], correct: 2 },
+                { id: 9, subject: "Mathematics", type: "NUMERIC", text: "Let f(x) be a polynomial of degree 3 such that f(-1) = 10, f(1) = -6, f(x) has a critical point at x = -1 and f'(x) has a critical point at x = 1. Then f(x) has a local minima at x = ?", correct: 3 },
+            ]
+        };
+
+        const formatTime = (seconds) => {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        };
+
+        // --- COMPONENTS ---
+
+        // 0. LOGIN COMPONENT
+        const Login = ({ onLoginSuccess }) => {
+            const [isLogin, setIsLogin] = useState(true);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError(null);
+                
+                try {
+                    const auth = window.AppFirebase.auth;
+                    if (isLogin) {
+                        await window.AppFirebase.signIn(auth, email, password);
+                    } else {
+                        await window.AppFirebase.signUp(auth, email, password);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    let msg = err.message;
+                    if(msg.includes('auth/invalid-email')) msg = "Invalid email address.";
+                    if(msg.includes('auth/user-not-found') || msg.includes('auth/invalid-credential')) msg = "Invalid email or password.";
+                    if(msg.includes('auth/wrong-password')) msg = "Invalid password.";
+                    if(msg.includes('auth/email-already-in-use')) msg = "Email already in use.";
+                    if(msg.includes('auth/weak-password')) msg = "Password should be at least 6 characters.";
+                    setError(msg);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 font-sans relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                        <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl"></div>
+                        <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl"></div>
+                    </div>
+
+                    <div className="glass-card w-full max-w-md p-8 rounded-2xl shadow-2xl relative z-10 border border-slate-800">
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 mx-auto bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20 mb-4">
+                                <Icons.Cpu size={32} className="text-white" />
+                            </div>
+                            <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
+                            <p className="text-slate-400 text-sm">Sign in to access your dashboard</p>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            {error && (
+                                <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm flex items-center gap-2">
+                                    <Icons.AlertCircle size={16} /> {error}
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Email Address</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Icons.Mail size={18} className="text-slate-500" />
+                                    </div>
+                                    <input 
+                                        type="email" 
+                                        required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all placeholder-slate-600"
+                                        placeholder="student@example.com"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Password</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Icons.Lock size={18} className="text-slate-500" />
+                                    </div>
+                                    <input 
+                                        type="password" 
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all placeholder-slate-600"
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+                            </div>
+
+                            <button 
+                                type="submit" 
+                                disabled={loading}
+                                className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 rounded-lg transition-all shadow-lg shadow-cyan-900/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
+                            >
+                                {loading ? <Icons.Loader className="animate-spin" /> : (
+                                    <>
+                                        {isLogin ? 'Sign In' : 'Create Account'}
+                                        <Icons.ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                    </>
+                                )}
+                            </button>
+                        </form>
+
+                        <div className="mt-8 pt-6 border-t border-slate-800 text-center">
+                            <p className="text-slate-400 text-sm">
+                                {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
+                                <button 
+                                    onClick={() => { setIsLogin(!isLogin); setError(null); }}
+                                    className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
+                                >
+                                    {isLogin ? 'Sign Up' : 'Log In'}
+                                </button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 1. DASHBOARD
+        const Dashboard = ({ tests, startTest, switchMode, user }) => {
+            const isAdmin = user && user.uid === ADMIN_UID;
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 font-sans selection:bg-cyan-500 selection:text-white">
+                    <header className="flex justify-between items-center mb-12">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                                <Icons.Cpu size={28} className="text-white" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
+                                    AuraTest
+                                </h1>
+                                <div className="text-xs text-slate-500 font-mono tracking-widest uppercase">
+                                    {isAdmin ? 'Administrator Access' : 'JEE Advanced Platform'}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4">
+                            <div className="hidden md:flex items-center gap-2 text-sm text-slate-400 bg-slate-900 py-1.5 px-3 rounded-full border border-slate-800">
+                               <Icons.User size={14} /> {user?.email}
+                            </div>
+                            
+                            {/* ADMIN BUTTON - CONDITIONALLY RENDERED */}
+                            {isAdmin && (
+                                <button 
+                                    onClick={switchMode}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-900/40 hover:bg-indigo-900/60 transition-all border border-indigo-500/40 text-indigo-300 text-sm font-medium hover:text-white hover:border-indigo-400"
+                                >
+                                    <Icons.Settings size={16} /> Admin Panel
+                                </button>
+                            )}
+
+                            <button 
+                                onClick={() => window.AppFirebase.logout(window.AppFirebase.auth)}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-900/10 hover:bg-red-900/30 transition-all border border-red-900/20 text-red-400 text-sm font-medium"
+                            >
+                                <Icons.LogOut size={16} /> Sign Out
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                            <div className="lg:col-span-2 space-y-8">
+                                {/* Hero Banner */}
+                                <div className="p-8 rounded-3xl bg-gradient-to-br from-indigo-900/40 to-slate-900/40 border border-indigo-500/20 backdrop-blur-xl relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl -mr-20 -mt-20 transition-all group-hover:bg-indigo-500/30"></div>
+                                    <div className="relative z-10">
+                                        <h2 className="text-4xl font-bold mb-4 text-white">Ready to conquer <br/><span className="text-indigo-400">JEE Mains?</span></h2>
+                                        <p className="text-slate-400 mb-8 max-w-md text-lg leading-relaxed">Access premium mock tests designed by top educators. Real-time analysis, NTA-style marking scheme.</p>
+                                        <div className="flex gap-6">
+                                            <div className="flex items-center gap-2 text-cyan-400 bg-cyan-950/30 px-3 py-1 rounded-full border border-cyan-500/20">
+                                                <Icons.Zap size={18} /> <span className="text-sm font-semibold">High Yield</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-purple-400 bg-purple-950/30 px-3 py-1 rounded-full border border-purple-500/20">
+                                                <Icons.Award size={18} /> <span className="text-sm font-semibold">Live Analysis</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Test List */}
+                                <div>
+                                    <h3 className="text-xl font-semibold mb-6 flex items-center gap-2 text-slate-200">
+                                        <Icons.BookOpen size={20} className="text-cyan-500" /> Available Tests
+                                    </h3>
+                                    <div className="grid gap-4">
+                                        {tests.length === 0 ? (
+                                            <div className="p-10 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/20 text-slate-500">
+                                                <p>No tests available at the moment.</p>
+                                                {isAdmin && <p className="text-sm text-cyan-500 mt-2">Go to Admin Panel to upload one.</p>}
+                                            </div>
+                                        ) : (
+                                            tests.map(test => (
+                                                <div key={test.id} className="group p-6 rounded-2xl glass-card hover:bg-slate-800/80 hover:border-cyan-500/50 transition-all cursor-pointer flex justify-between items-center" onClick={() => startTest(test)}>
+                                                    <div>
+                                                        <h4 className="font-bold text-xl text-slate-200 group-hover:text-cyan-400 transition-colors">{test.title}</h4>
+                                                        <div className="flex gap-6 mt-3 text-sm text-slate-400 font-mono">
+                                                            <span className="flex items-center gap-2"><Icons.Clock size={14} /> {test.duration} MINS</span>
+                                                            <span className="flex items-center gap-2"><Icons.CheckCircle size={14} /> {test.totalMarks} MARKS</span>
+                                                            <span className="flex items-center gap-2"><Icons.FileText size={14} /> {test.questions.length} Qs</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center group-hover:bg-cyan-500 group-hover:text-black group-hover:border-cyan-400 transition-all shadow-lg">
+                                                        <Icons.ChevronRight size={24} />
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Sidebar Stats */}
+                            <div className="space-y-6">
+                                <div className="p-6 rounded-2xl glass-card border border-slate-800">
+                                    <h3 className="font-semibold mb-6 text-slate-200 flex items-center gap-2"><Icons.LayoutGrid size={18} /> Subject Mastery</h3>
+                                    <div className="space-y-6">
+                                        <div>
+                                            <div className="flex justify-between text-xs font-bold uppercase text-slate-500 mb-2"><span>Physics</span> <span>0%</span></div>
+                                            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[0%] bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)] transition-all duration-1000"></div></div>
+                                        </div>
+                                        <div>
+                                            <div className="flex justify-between text-xs font-bold uppercase text-slate-500 mb-2"><span>Chemistry</span> <span>0%</span></div>
+                                            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[0%] bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)] transition-all duration-1000"></div></div>
+                                        </div>
+                                        <div>
+                                            <div className="flex justify-between text-xs font-bold uppercase text-slate-500 mb-2"><span>Mathematics</span> <span>0%</span></div>
+                                            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[0%] bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.5)] transition-all duration-1000"></div></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="p-6 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 text-center relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+                                    <div className="relative z-10">
+                                        <div className="w-16 h-16 mx-auto bg-slate-800 rounded-full flex items-center justify-center mb-4 border border-slate-700 shadow-inner">
+                                            <span className="text-3xl grayscale opacity-50">🔥</span>
+                                        </div>
+                                        <h4 className="font-bold text-white text-lg">Daily Streak</h4>
+                                        <p className="text-slate-500 text-sm mt-2">Complete your first test to start your streak!</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. ADMIN PANEL
+        const AdminPanel = ({ onUpload, onCancel }) => {
+            const [jsonInput, setJsonInput] = useState(''); 
+            const [error, setError] = useState(null);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [fileName, setFileName] = useState(null);
+            const [uploading, setUploading] = useState(false);
+            
+            const fileInputRef = useRef(null);
+
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file && file.type === "application/pdf") {
+                    setFileName(file.name);
+                    setIsProcessing(true);
+                    
+                    // Simulate processing delay
+                    setTimeout(() => {
+                        setIsProcessing(false);
+                        
+                        // Provide a blank template
+                        const templateData = {
+                            title: file.name.replace('.pdf', '') || "Uploaded Test",
+                            duration: 180, 
+                            totalMarks: 300,
+                            subjects: ["Physics", "Chemistry", "Mathematics"],
+                            questions: [
+                                { 
+                                    id: 1, 
+                                    subject: "Physics", 
+                                    type: "MCQ", 
+                                    text: "Paste Question 1 from PDF here...", 
+                                    options: ["Option A", "Option B", "Option C", "Option D"], 
+                                    correct: 0 
+                                },
+                                { 
+                                    id: 2, 
+                                    subject: "Chemistry", 
+                                    type: "NUMERIC", 
+                                    text: "Paste Question 2 from PDF here...", 
+                                    correct: 5 
+                                }
+                            ]
+                        };
+                        setJsonInput(JSON.stringify(templateData, null, 2));
+                    }, 1500);
+                } else {
+                    setError("Please upload a valid PDF file.");
+                }
+            };
+
+            const handleUpload = async () => {
+                try {
+                    if (!jsonInput) throw new Error("Please upload a PDF to extract data first.");
+                    const parsed = JSON.parse(jsonInput);
+                    if(!parsed.questions || !parsed.subjects) throw new Error("Invalid format: Missing questions or subjects array");
+                    
+                    setUploading(true);
+                    await onUpload(parsed);
+                    setUploading(false);
+                    setError(null);
+                } catch (e) {
+                    setUploading(false);
+                    setError(e.message);
+                }
+            };
+
+            const handleLoadDemo = () => {
+                setJsonInput(JSON.stringify(INITIAL_TEST_DATA, null, 2));
+                setFileName("Demo_Test.pdf (Simulated)");
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-white p-4 flex flex-col items-center justify-center font-sans">
+                    <div className="w-full max-w-4xl glass-card rounded-2xl p-8 shadow-2xl relative">
+                        <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+                            <h2 className="text-2xl font-bold flex items-center gap-3 text-cyan-400">
+                                <Icons.Settings size={24} /> Admin Console
+                            </h2>
+                            <button onClick={onCancel} className="text-slate-500 hover:text-white transition-colors"><Icons.XCircle /></button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* Left Side: Upload PDF */}
+                            <div className="md:col-span-1 space-y-4">
+                                <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                                    <h3 className="font-bold text-slate-300 mb-2 text-sm uppercase tracking-wider">Step 1: Upload Paper</h3>
+                                    <div 
+                                        onClick={() => fileInputRef.current.click()}
+                                        className="border-2 border-dashed border-slate-700 hover:border-cyan-500 hover:bg-slate-800/50 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-all text-center h-48"
+                                    >
+                                        <input 
+                                            type="file" 
+                                            accept="application/pdf" 
+                                            ref={fileInputRef} 
+                                            className="hidden" 
+                                            onChange={handleFileChange}
+                                        />
+                                        {isProcessing ? (
+                                            <div className="flex flex-col items-center gap-3 text-cyan-400">
+                                                <Icons.Loader size={32} className="animate-spin" />
+                                                <span className="text-xs font-mono">Initializing Template...</span>
+                                            </div>
+                                        ) : fileName ? (
+                                            <div className="flex flex-col items-center gap-3 text-green-400">
+                                                <Icons.CheckCircle size={32} />
+                                                <span className="text-xs font-medium break-all">{fileName}</span>
+                                                <span className="text-[10px] text-slate-500">Click to change</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-3 text-slate-400">
+                                                <Icons.Upload size={32} />
+                                                <span className="text-xs">Drop PDF here or Click</span>
+                                                <span className="text-[10px] text-slate-600">Supports .pdf</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button onClick={handleLoadDemo} className="w-full mt-2 text-xs text-indigo-400 hover:text-indigo-300 underline">Load Demo Data (Testing)</button>
+                                </div>
+                            </div>
+                            
+                            {/* Right Side: Verify Data */}
+                            <div className="md:col-span-2">
+                                <div className="flex flex-col mb-2">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="font-bold text-slate-300 text-sm uppercase tracking-wider">Step 2: JSON Structure</h3>
+                                        {jsonInput && <span className="text-[10px] text-green-400 bg-green-900/20 px-2 py-0.5 rounded">Template Ready</span>}
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 mt-1">Review the data before publishing to the live server.</p>
+                                </div>
+                                <div className="relative">
+                                    <textarea 
+                                        className="w-full h-80 bg-slate-900 border border-slate-700 rounded-xl p-4 font-mono text-sm text-green-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 resize-none custom-scrollbar"
+                                        value={jsonInput}
+                                        onChange={(e) => setJsonInput(e.target.value)}
+                                        spellCheck="false"
+                                        placeholder="Upload a PDF to generate the test structure template..."
+                                        disabled={isProcessing || uploading}
+                                    />
+                                    {!jsonInput && !isProcessing && (
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <span className="text-slate-600 text-sm">Waiting for PDF upload...</span>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {error && <div className="mt-3 p-3 bg-red-900/20 text-red-400 rounded-lg border border-red-900/50 flex items-center gap-2 text-sm"><Icons.AlertCircle size={16}/> {error}</div>}
+                                
+                                <div className="flex justify-end gap-3 mt-4">
+                                    <button onClick={onCancel} disabled={uploading} className="px-6 py-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">Cancel</button>
+                                    <button 
+                                        onClick={handleUpload} 
+                                        disabled={!jsonInput || uploading}
+                                        className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 shadow-lg transition-all transform active:scale-95 ${(!jsonInput || uploading) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-900/20'}`}
+                                    >
+                                        {uploading ? <Icons.Loader className="animate-spin" /> : <Icons.CheckCircle size={18} />} 
+                                        {uploading ? "Publishing..." : "Publish Test"}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. TEST INTERFACE
+        const TestInterface = ({ test, onSubmit }) => {
+            const [currentQIndex, setCurrentQIndex] = useState(0);
+            const [answers, setAnswers] = useState({});
+            const [status, setStatus] = useState({}); 
+            const [timeLeft, setTimeLeft] = useState(test.duration * 60);
+            const [selectedSubject, setSelectedSubject] = useState(test.subjects[0]);
+            const [showPalette, setShowPalette] = useState(true);
+
+            // Filter questions for the current selected subject
+            const subjectQuestions = useMemo(() => 
+                test.questions.filter(q => q.subject === selectedSubject), 
+            [test.questions, selectedSubject]);
+
+            // Global index mapping: Find the actual index of the question in the global list to map Next/Prev correctly within subject
+            const currentQuestion = subjectQuestions[currentQIndex];
+
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    setTimeLeft(prev => {
+                        if (prev <= 1) {
+                            clearInterval(timer);
+                            handleSubmit();
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            // Reset local index when subject changes
+            useEffect(() => {
+                setCurrentQIndex(0);
+            }, [selectedSubject]);
+
+            const handleAnswer = (val) => {
+                if(!currentQuestion) return;
+                const qId = currentQuestion.id;
+                setAnswers(prev => ({ ...prev, [qId]: val }));
+                updateStatus(qId, 'answered');
+            };
+
+            const updateStatus = (qId, newStatus) => {
+                setStatus(prev => ({ ...prev, [qId]: newStatus }));
+            };
+
+            const clearResponse = () => {
+                if(!currentQuestion) return;
+                const qId = currentQuestion.id;
+                const newAnswers = { ...answers };
+                delete newAnswers[qId];
+                setAnswers(newAnswers);
+                updateStatus(qId, 'visited');
+            };
+
+            const markForReview = () => {
+                if(!currentQuestion) return;
+                const qId = currentQuestion.id;
+                const hasAnswer = answers[qId] !== undefined;
+                updateStatus(qId, hasAnswer ? 'answered_marked' : 'marked');
+                if (currentQIndex < subjectQuestions.length - 1) setCurrentQIndex(prev => prev + 1);
+            };
+
+            const nextQuestion = () => {
+                if(!currentQuestion) return;
+                const qId = currentQuestion.id;
+                if (!status[qId]) updateStatus(qId, 'visited');
+                if (currentQIndex < subjectQuestions.length - 1) setCurrentQIndex(prev => prev + 1);
+            };
+
+            const prevQuestion = () => {
+                if (currentQIndex > 0) setCurrentQIndex(prev => prev - 1);
+            };
+
+            const jumpToQuestion = (qId) => {
+                // Find which subject this question belongs to
+                const q = test.questions.find(fq => fq.id === qId);
+                if(q) {
+                    if(q.subject !== selectedSubject) setSelectedSubject(q.subject);
+                    // We need to wait for the subject render cycle to update the index, but effectively we can find index in the NEW list
+                    const subQuestions = test.questions.filter(sq => sq.subject === q.subject);
+                    const idx = subQuestions.findIndex(sq => sq.id === qId);
+                    setCurrentQIndex(idx); // This works because React state updates batch
+                    if (!status[qId]) updateStatus(qId, 'visited');
+                }
+            }
+
+            const handleSubmit = () => {
+                onSubmit({ answers, status, timeTaken: (test.duration * 60) - timeLeft });
+            };
+
+            const getStatusColor = (qId) => {
+                if (qId === currentQuestion?.id) return "ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-900 border-cyan-400";
+                const s = status[qId];
+                if (s === 'answered') return "bg-green-600 text-white border-green-600 shadow-[0_0_8px_rgba(22,163,74,0.4)]";
+                if (s === 'marked') return "bg-purple-600 text-white border-purple-600 shadow-[0_0_8px_rgba(147,51,234,0.4)]";
+                if (s === 'answered_marked') return "bg-purple-600 text-white border-purple-600 relative after:content-[''] after:absolute after:bottom-1 after:right-1 after:w-2 after:h-2 after:bg-green-400 after:rounded-full";
+                if (s === 'visited') return "bg-red-500/80 text-white border-red-500";
+                return "bg-slate-800 text-slate-400 border-slate-700";
+            };
+
+            if (!currentQuestion) return <div className="text-white p-10 flex items-center justify-center h-screen bg-slate-950">Loading Question...</div>;
+
+            return (
+                <div className="h-screen bg-slate-950 text-slate-200 flex flex-col overflow-hidden font-sans">
+                    <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0 z-20 shadow-md">
+                        <div className="flex items-center gap-4">
+                            <div className="font-bold text-xl text-cyan-400 tracking-wider flex items-center gap-2">
+                                <Icons.Cpu size={20}/> AuraTest
+                            </div>
+                            <div className="h-6 w-px bg-slate-700 mx-2 hidden md:block"></div>
+                            <div className="text-sm font-medium text-slate-400 hidden md:block">{test.title}</div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <div className={`bg-slate-800 px-4 py-1.5 rounded-lg border border-slate-700 flex items-center gap-3 ${timeLeft < 300 ? 'border-red-500/50 bg-red-900/10' : ''}`}>
+                                <Icons.Clock size={16} className={timeLeft < 300 ? 'text-red-500' : 'text-slate-400'} />
+                                <span className={`font-mono text-xl font-bold ${timeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                                    {formatTime(timeLeft)}
+                                </span>
+                            </div>
+                            <button 
+                                onClick={() => { if(window.confirm("Are you sure you want to submit the test?")) handleSubmit(); }}
+                                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold px-6 py-2 rounded-lg transition-all shadow-lg shadow-green-900/20"
+                            >
+                                Submit
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="flex flex-1 overflow-hidden relative">
+                        <div className="flex-1 flex flex-col relative z-10 min-w-0">
+                            <div className="h-14 bg-slate-900/50 border-b border-slate-800 flex items-center px-6 gap-1 overflow-x-auto no-scrollbar">
+                                {test.subjects.map(sub => (
+                                    <button
+                                        key={sub}
+                                        onClick={() => { setSelectedSubject(sub); }}
+                                        className={`px-6 py-3 text-sm font-bold uppercase tracking-wider transition-all relative ${selectedSubject === sub ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}
+                                    >
+                                        {sub}
+                                        {selectedSubject === sub && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-400 shadow-[0_-2px_6px_rgba(34,211,238,0.5)]"></div>}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex-1 p-6 md:p-10 overflow-y-auto custom-scrollbar bg-gradient-to-b from-slate-950 to-[#050b1a]">
+                                <div className="max-w-4xl mx-auto">
+                                    <div className="flex justify-between items-start mb-8 pb-4 border-b border-slate-800">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-3xl font-bold text-slate-700">Q{currentQIndex + 1}</span>
+                                            <span className="text-sm text-slate-500 mt-2">/ {subjectQuestions.length}</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <span className="text-xs font-bold bg-green-500/10 text-green-400 px-3 py-1.5 rounded border border-green-500/20">+4</span>
+                                            {/* Logic to show correct negative marking based on type */}
+                                            <span className="text-xs font-bold bg-red-500/10 text-red-400 px-3 py-1.5 rounded border border-red-500/20">
+                                                {currentQuestion.type === 'NUMERIC' ? '0' : '-1'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-xl md:text-2xl leading-relaxed mb-10 font-medium text-slate-100 selection:bg-cyan-500/30">
+                                        {currentQuestion.text}
+                                    </p>
+
+                                    <div className="space-y-4 max-w-2xl">
+                                        {currentQuestion.type === 'MCQ' ? (
+                                            currentQuestion.options.map((opt, idx) => (
+                                                <label 
+                                                    key={idx}
+                                                    className={`flex items-center p-5 rounded-xl border cursor-pointer transition-all group relative overflow-hidden ${answers[currentQuestion.id] === idx 
+                                                        ? 'bg-cyan-950/30 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.1)]' 
+                                                        : 'bg-slate-900 border-slate-800 hover:border-slate-600 hover:bg-slate-800'}`}
+                                                >
+                                                    <input 
+                                                        type="radio" 
+                                                        name={`q-${currentQuestion.id}`} 
+                                                        checked={answers[currentQuestion.id] === idx}
+                                                        onChange={() => handleAnswer(idx)}
+                                                        className="hidden"
+                                                    />
+                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-5 transition-colors shrink-0 ${answers[currentQuestion.id] === idx ? 'border-cyan-400 bg-cyan-400' : 'border-slate-600 group-hover:border-slate-400'}`}>
+                                                        {answers[currentQuestion.id] === idx && <div className="w-2 h-2 bg-slate-950 rounded-full"></div>}
+                                                    </div>
+                                                    <span className={`text-lg ${answers[currentQuestion.id] === idx ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>{opt}</span>
+                                                </label>
+                                            ))
+                                        ) : (
+                                            <div className="mt-8 p-6 bg-slate-900 rounded-xl border border-slate-800">
+                                                <label className="text-cyan-400 text-sm font-bold uppercase tracking-wider mb-3 block">Numerical Answer (Integer)</label>
+                                                <input 
+                                                    type="number"
+                                                    value={answers[currentQuestion.id] || ''}
+                                                    onChange={(e) => handleAnswer(parseFloat(e.target.value))}
+                                                    className="bg-slate-950 border border-slate-700 text-white text-3xl font-mono p-4 rounded-lg w-full md:w-64 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 placeholder-slate-700"
+                                                    placeholder="0"
+                                                />
+                                                <p className="text-slate-500 text-xs mt-2">* No negative marking for this section.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-4 md:px-8 shrink-0 z-20">
+                                <div className="flex gap-4">
+                                    <button onClick={markForReview} className="px-5 py-2.5 rounded-lg border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 font-medium transition-all text-sm flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-purple-500"></div> Mark for Review
+                                    </button>
+                                    <button onClick={clearResponse} className="px-5 py-2.5 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 font-medium transition-all text-sm hidden md:block">
+                                        Clear
+                                    </button>
+                                </div>
+                                <div className="flex gap-4">
+                                    <button onClick={prevQuestion} disabled={currentQIndex === 0} className="px-6 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 border border-slate-700">
+                                        <Icons.ChevronLeft size={18} /> Prev
+                                    </button>
+                                    <button onClick={nextQuestion} className="px-6 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-all flex items-center gap-2 shadow-lg shadow-cyan-900/20">
+                                        Next <Icons.ChevronRight size={18} />
+                                    </button>
+                                </div>
+                            </footer>
+                        </div>
+
+                        <div className={`fixed inset-y-0 right-0 w-80 bg-slate-900 border-l border-slate-800 flex flex-col transition-transform duration-300 z-30 shadow-2xl ${showPalette ? 'translate-x-0' : 'translate-x-full'} md:relative md:translate-x-0`}>
+                            <div className="p-4 bg-slate-800/80 border-b border-slate-700 flex justify-between items-center backdrop-blur">
+                                <h3 className="font-bold text-slate-200 flex items-center gap-2"><Icons.LayoutGrid size={16}/> Question Palette</h3>
+                                <button onClick={() => setShowPalette(false)} className="md:hidden text-slate-400 hover:text-white"><Icons.XCircle size={20}/></button>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-900">
+                                {test.subjects.map(sub => {
+                                    const subQs = test.questions.filter(q => q.subject === sub);
+                                    if(subQs.length === 0) return null;
+                                    return (
+                                        <div key={sub} className="mb-6">
+                                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 sticky top-0 bg-slate-900 py-1">{sub}</h4>
+                                            <div className="grid grid-cols-4 gap-3">
+                                                {subQs.map((q, i) => (
+                                                    <button 
+                                                        key={q.id}
+                                                        onClick={() => jumpToQuestion(q.id)}
+                                                        className={`aspect-square rounded-lg text-xs font-bold flex items-center justify-center border transition-all ${getStatusColor(q.id)}`}
+                                                    >
+                                                        {i + 1}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                                
+                                <div className="mt-8 space-y-4 p-4 bg-slate-800/50 rounded-xl border border-slate-800">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Legend</h4>
+                                    <div className="grid grid-cols-2 gap-3 text-xs text-slate-400">
+                                        <div className="flex items-center gap-2"><div className="w-3 h-3 bg-green-600 rounded"></div> Answered</div>
+                                        <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-500 rounded"></div> Not Answered</div>
+                                        <div className="flex items-center gap-2"><div className="w-3 h-3 bg-slate-800 border border-slate-700 rounded"></div> Not Visited</div>
+                                        <div className="flex items-center gap-2"><div className="w-3 h-3 bg-purple-600 rounded"></div> Review</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {!showPalette && (
+                        <button onClick={() => setShowPalette(true)} className="fixed top-20 right-0 bg-slate-800 p-3 rounded-l-xl border-l border-y border-slate-700 text-cyan-400 shadow-xl z-50 md:hidden">
+                            <Icons.Menu size={20} />
+                        </button>
+                    )}
+                </div>
+            );
+        };
+
+        // 4. RESULTS / ANALYTICS
+        const Analytics = ({ test, results, onHome }) => {
+            const { answers, status, timeTaken } = results;
+            
+            const stats = useMemo(() => {
+                let score = 0;
+                let correct = 0;
+                let wrong = 0;
+                let attempted = 0;
+                const subjectStats = {};
+
+                test.subjects.forEach(sub => subjectStats[sub] = { correct: 0, wrong: 0, total: 0, score: 0 });
+
+                test.questions.forEach(q => {
+                    const sub = q.subject;
+                    subjectStats[sub].total++;
+                    
+                    const userAns = answers[q.id];
+                    if (userAns !== undefined) {
+                        attempted++;
+                        let isCorrect = false;
+                        if (q.type === 'MCQ') isCorrect = userAns === q.correct;
+                        else isCorrect = Math.abs(userAns - q.correct) < 0.1;
+
+                        if (isCorrect) {
+                            score += 4;
+                            correct++;
+                            subjectStats[sub].correct++;
+                            subjectStats[sub].score += 4;
+                        } else {
+                            if (q.type !== 'NUMERIC') {
+                                score -= 1;
+                                subjectStats[sub].score -= 1;
+                            }
+                            wrong++;
+                            subjectStats[sub].wrong++;
+                        }
+                    }
+                });
+
+                return { score, correct, wrong, attempted, subjectStats };
+            }, [test, results]);
+
+            const accuracy = stats.attempted > 0 ? Math.round((stats.correct / stats.attempted) * 100) : 0;
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 font-sans">
+                    <div className="max-w-6xl mx-auto">
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
+                            <div>
+                                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500">Analysis Report</h1>
+                                <p className="text-slate-500 text-sm mt-1">Detailed breakdown of your performance</p>
+                            </div>
+                            <button onClick={onHome} className="flex items-center gap-2 px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors border border-slate-700">
+                                <Icons.LogOut size={18} /> Back to Dashboard
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                            <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><Icons.Award size={80} /></div>
+                                <div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Total Score</div>
+                                <div className="text-5xl font-bold text-white mb-2">{stats.score} <span className="text-lg text-slate-600 font-normal">/ {test.questions.length * 4}</span></div>
+                                <div className="inline-flex items-center gap-1 text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded border border-green-500/20">
+                                    Predicted Rank: {stats.score > 200 ? 'Under 1000' : 'Analyzing...'}
+                                </div>
+                            </div>
+                            
+                            <div className="glass-card p-6 rounded-2xl">
+                                <div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Accuracy</div>
+                                <div className="text-5xl font-bold text-cyan-400 mb-4">{accuracy}%</div>
+                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div className="bg-cyan-500 h-full transition-all duration-1000" style={{ width: `${accuracy}%` }}></div>
+                                </div>
+                            </div>
+
+                            <div className="glass-card p-6 rounded-2xl">
+                                <div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Time Taken</div>
+                                <div className="text-5xl font-bold text-purple-400 mb-2">{formatTime(timeTaken)}</div>
+                                <div className="text-xs text-slate-500">Avg time per question: {Math.round(timeTaken/test.questions.length)}s</div>
+                            </div>
+
+                            <div className="glass-card p-6 rounded-2xl">
+                                <div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Attempted</div>
+                                <div className="text-5xl font-bold text-white mb-4">{stats.attempted} <span className="text-xl text-slate-600">/ {test.questions.length}</span></div>
+                                <div className="flex gap-4 text-sm font-medium">
+                                    <span className="text-green-400 flex items-center gap-1"><Icons.CheckCircle size={14}/> {stats.correct}</span>
+                                    <span className="text-red-400 flex items-center gap-1"><Icons.XCircle size={14}/> {stats.wrong}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div className="glass-card rounded-2xl p-8 border border-slate-800">
+                                <h3 className="text-xl font-bold mb-8 flex items-center gap-2 text-slate-200">
+                                    <Icons.LayoutGrid size={20} className="text-indigo-400" /> Subject-wise Performance
+                                </h3>
+                                <div className="space-y-8">
+                                    {Object.entries(stats.subjectStats).map(([sub, data]) => (
+                                        <div key={sub}>
+                                            <div className="flex justify-between mb-3 items-end">
+                                                <span className="font-bold text-lg text-slate-300">{sub}</span>
+                                                <span className="text-2xl font-bold text-white">{data.score} <span className="text-sm text-slate-500 font-normal">pts</span></span>
+                                            </div>
+                                            <div className="flex h-4 w-full rounded-full overflow-hidden bg-slate-800 border border-slate-700">
+                                                <div className="bg-green-500 h-full" style={{ width: `${data.total ? (data.correct / data.total) * 100 : 0}%` }}></div>
+                                                <div className="bg-red-500 h-full" style={{ width: `${data.total ? (data.wrong / data.total) * 100 : 0}%` }}></div>
+                                            </div>
+                                            <div className="flex justify-between mt-2 text-xs font-medium text-slate-500 uppercase tracking-wide">
+                                                <span>{data.correct} Correct</span>
+                                                <span>{data.wrong} Wrong</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="glass-card rounded-2xl p-8 border border-slate-800 flex flex-col items-center justify-center text-center">
+                                <div className="relative w-64 h-64 mb-8">
+                                    <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                                        <path className="text-slate-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="2" />
+                                        <path className="text-cyan-500 drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]" strokeDasharray={`${accuracy}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="2" />
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-5xl font-bold text-white">{stats.score > 100 ? 'Good' : 'Avg'}</span>
+                                        <span className="text-slate-500 text-sm uppercase tracking-widest mt-2">Performance</span>
+                                    </div>
+                                </div>
+                                <h4 className="text-xl font-bold text-white mb-2">Next Steps</h4>
+                                <p className="text-slate-400 max-w-sm">
+                                    {accuracy > 80 
+                                        ? "Great job! Your accuracy is solid. Now focus on reducing time per question." 
+                                        : "Focus on accuracy first. Avoid guessing in the negative marking sections."}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [view, setView] = useState('home'); 
+            const [tests, setTests] = useState([]); // Empty initially, populated from Firestore
+            const [activeTest, setActiveTest] = useState(null);
+            const [testResults, setTestResults] = useState(null);
+            const [user, setUser] = useState(null);
+            const [authLoading, setAuthLoading] = useState(true);
+
+            // Authentication Listener
+            useEffect(() => {
+                if (window.AppFirebase && window.AppFirebase.onAuthChange) {
+                    const unsubscribe = window.AppFirebase.onAuthChange(window.AppFirebase.auth, (currentUser) => {
+                        setUser(currentUser);
+                        setAuthLoading(false);
+                        if (!currentUser) setView('home'); 
+                        
+                        if(currentUser) {
+                            console.log("%c 🔑 YOUR USER ID: " + currentUser.uid, "color: cyan; font-size: 16px; font-weight: bold;");
+                            console.log("Copy this ID and paste it into the ADMIN_UID variable in the code.");
+                        }
+                    });
+                    return () => unsubscribe();
+                } else {
+                    setAuthLoading(false);
+                }
+            }, []);
+
+            // Firestore Real-time Listener for Tests
+            useEffect(() => {
+                if (!user) return; // Only listen if logged in
+                
+                try {
+                    const { db, collection, onSnapshot, query, orderBy } = window.AppFirebase;
+                    // Listen to 'tests' subcollection in public data
+                    const q = query(
+                        collection(db, 'artifacts', APP_ID, 'public', 'data', 'tests'),
+                        orderBy('timestamp', 'desc')
+                    );
+                    
+                    const unsubscribe = onSnapshot(q, (snapshot) => {
+                        const fetchedTests = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        setTests(fetchedTests);
+                    }, (error) => {
+                        console.error("Error fetching tests:", error);
+                    });
+                    
+                    return () => unsubscribe();
+                } catch(e) {
+                    console.error("Firestore Error:", e);
+                }
+            }, [user]);
+
+            const startTest = (test) => {
+                setActiveTest(test);
+                setView('test');
+            };
+
+            const handleTestSubmit = (results) => {
+                setTestResults(results);
+                setView('result');
+            };
+
+            const handleUpload = async (newTest) => {
+                const { db, collection, addDoc } = window.AppFirebase;
+                
+                // Add timestamp for sorting
+                const testData = {
+                    ...newTest,
+                    timestamp: Date.now(),
+                    uploadedBy: user.email
+                };
+
+                await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'tests'), testData);
+                
+                setView('home');
+                // Success message handled by UI state update via Firestore listener
+            };
+
+            if (authLoading) {
+                return (
+                    <div className="min-h-screen bg-slate-950 flex items-center justify-center flex-col gap-4">
+                        <Icons.Loader size={48} className="text-cyan-500 animate-spin" />
+                        <span className="text-slate-500 font-mono text-sm tracking-widest uppercase">Initializing Secure Environment...</span>
+                    </div>
+                );
+            }
+
+            if (!user) {
+                return <Login />;
+            }
+
+            // Route Guard for Admin
+            if(view === 'admin' && user.uid !== ADMIN_UID) {
+                setView('home');
+                return null;
+            }
+
+            return (
+                <div className="antialiased">
+                    {view === 'home' && (
+                        <Dashboard 
+                            tests={tests} 
+                            startTest={startTest} 
+                            switchMode={() => setView('admin')} 
+                            user={user}
+                        />
+                    )}
+                    
+                    {view === 'admin' && (
+                        <AdminPanel 
+                            onUpload={handleUpload} 
+                            onCancel={() => setView('home')} 
+                        />
+                    )}
+
+                    {view === 'test' && activeTest && (
+                        <TestInterface 
+                            test={activeTest} 
+                            onSubmit={handleTestSubmit} 
+                        />
+                    )}
+
+                    {view === 'result' && testResults && (
+                        <Analytics 
+                            test={activeTest} 
+                            results={testResults} 
+                            onHome={() => { setView('home'); setActiveTest(null); setTestResults(null); }} 
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
