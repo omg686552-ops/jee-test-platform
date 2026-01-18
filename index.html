@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AuraTest - JEE Advanced Series</title>
+    <title>AuraTest - JEE Mains Series</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -99,6 +99,7 @@
             collection,
             doc,
             addDoc,
+            setDoc,
             deleteDoc,
             getDocs,
             onSnapshot,
@@ -160,6 +161,7 @@
                 collection,
                 doc,
                 addDoc,
+                setDoc,
                 deleteDoc,
                 onSnapshot,
                 query,
@@ -188,7 +190,6 @@
         const ADMIN_UID = "XZ3MBiY8gdU7r6UexqFSX0t1SiI3"; 
 
         // --- GLOBAL APP ID FOR FIRESTORE PATHS ---
-        // CHANGED: Added '_clean_v2' to give a fresh start with no demo data
         const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'auratest_clean_v2';
 
         // --- ICONS ---
@@ -203,6 +204,7 @@
             AlertCircle: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>} />,
             ChevronRight: (p) => <Icon {...p} path={<polyline points="9 18 15 12 9 6"/>} />,
             ChevronLeft: (p) => <Icon {...p} path={<polyline points="15 18 9 12 15 6"/>} />,
+            ChevronDown: (p) => <Icon {...p} path={<polyline points="6 9 12 15 18 9"/>} />,
             Upload: (p) => <Icon {...p} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>} />,
             BookOpen: (p) => <Icon {...p} path={<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>} />,
             Cpu: (p) => <Icon {...p} path={<><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></>} />,
@@ -225,6 +227,8 @@
             Folder: (p) => <Icon {...p} path={<><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></>} />,
             FolderPlus: (p) => <Icon {...p} path={<><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></>} />,
             Layers: (p) => <Icon {...p} path={<><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>} />,
+            RefreshCw: (p) => <Icon {...p} path={<><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>} />,
+            Home: (p) => <Icon {...p} path={<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>} />,
         };
 
        
@@ -359,15 +363,43 @@
         };
 
         // 1. DASHBOARD
-        const Dashboard = ({ tests, startTest, switchMode, user, folders }) => {
+        const Dashboard = ({ tests, startTest, switchMode, user, folders, attempts }) => {
             const isAdmin = user && user.uid === ADMIN_UID;
             const [selectedFolderId, setSelectedFolderId] = useState('ALL');
 
-            // Filter tests based on selected folder
+            // Find current folder object
+            const currentFolder = useMemo(() => folders.find(f => f.id === selectedFolderId), [folders, selectedFolderId]);
+
+            // Filter subfolders (children of current selection)
+            const subFolders = useMemo(() => {
+                if(selectedFolderId === 'ALL') return [];
+                return folders.filter(f => f.parentId === selectedFolderId);
+            }, [folders, selectedFolderId]);
+
+            // Filter tests based on selected folder (Exact Match - Tests live in the specific folder/subfolder)
             const filteredTests = useMemo(() => {
                 if (selectedFolderId === 'ALL') return tests;
                 return tests.filter(t => t.folderId === selectedFolderId);
             }, [tests, selectedFolderId]);
+
+            // Root folders for sidebar (folders with no parent)
+            const rootFolders = useMemo(() => folders.filter(f => !f.parentId), [folders]);
+
+            // Breadcrumb Logic
+            const breadcrumbs = useMemo(() => {
+                if(selectedFolderId === 'ALL') return [{ id: 'ALL', name: 'Home' }];
+                const path = [];
+                let curr = currentFolder;
+                while(curr) {
+                    path.unshift(curr);
+                    curr = folders.find(f => f.id === curr.parentId);
+                }
+                return [{ id: 'ALL', name: 'Home' }, ...path];
+            }, [currentFolder, folders, selectedFolderId]);
+
+            const handleFolderClick = (folderId) => {
+                setSelectedFolderId(folderId);
+            };
 
             return (
                 <div className="min-h-screen bg-slate-950 text-white p-4 md:p-6 font-sans selection:bg-cyan-500 selection:text-white flex flex-col h-screen overflow-hidden">
@@ -381,7 +413,7 @@
                                     AuraTest
                                 </h1>
                                 <div className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">
-                                    {isAdmin ? 'Administrator Access' : 'JEE Advanced Platform'}
+                                    {isAdmin ? 'Administrator Access' : 'JEE Mains Platform'}
                                 </div>
                             </div>
                         </div>
@@ -411,10 +443,10 @@
                     </header>
 
                     <div className="flex flex-1 gap-6 overflow-hidden max-w-7xl mx-auto w-full">
-                        {/* VERTICAL FOLDER SIDEBAR */}
+                        {/* VERTICAL FOLDER SIDEBAR - Only Roots */}
                         <aside className="w-16 md:w-64 flex flex-col gap-4 bg-slate-900/30 border-r border-slate-800/50 md:bg-transparent md:border-none shrink-0 py-2">
                              <div className="hidden md:flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-wider px-2">
-                                <Icons.Layers size={14}/> Categories
+                                <Icons.Layers size={14}/> Main Categories
                              </div>
 
                              <div className="flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-2">
@@ -428,20 +460,20 @@
                                         <Icons.LayoutGrid size={16} />
                                     </div>
                                     <div className="hidden md:block">
-                                        <div className="text-sm font-semibold">All Tests</div>
-                                        <div className="text-[10px] opacity-70">View everything</div>
+                                        <div className="text-sm font-semibold">All Content</div>
+                                        <div className="text-[10px] opacity-70">Home</div>
                                     </div>
                                 </button>
 
-                                {folders.map(folder => (
+                                {rootFolders.map(folder => (
                                     <button 
                                         key={folder.id}
                                         onClick={() => setSelectedFolderId(folder.id)}
-                                        className={`w-full text-left px-3 md:px-4 py-3 rounded-xl transition-all flex items-center gap-3 group ${selectedFolderId === folder.id 
+                                        className={`w-full text-left px-3 md:px-4 py-3 rounded-xl transition-all flex items-center gap-3 group ${breadcrumbs.some(b => b.id === folder.id)
                                             ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20 border border-indigo-500/50' 
                                             : 'hover:bg-slate-800 text-slate-400 hover:text-white border border-transparent'}`}
                                     >
-                                        <div className={`p-1.5 rounded-lg ${selectedFolderId === folder.id ? 'bg-white/20' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
+                                        <div className={`p-1.5 rounded-lg ${breadcrumbs.some(b => b.id === folder.id) ? 'bg-white/20' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
                                             <Icons.Folder size={16} />
                                         </div>
                                         <div className="hidden md:block truncate">
@@ -455,84 +487,107 @@
 
                         {/* MAIN CONTENT AREA */}
                         <main className="flex-1 flex flex-col overflow-hidden bg-slate-900/20 rounded-2xl border border-slate-800/50 relative">
-                             {/* Header inside main content */}
-                             <div className="p-6 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10 flex justify-between items-end">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                                        {selectedFolderId === 'ALL' ? 'All Available Tests' : 
-                                         folders.find(f => f.id === selectedFolderId)?.name || 'Selected Folder'}
-                                    </h2>
-                                    <p className="text-slate-500 text-sm mt-1">
-                                        {filteredTests.length} {filteredTests.length === 1 ? 'test' : 'tests'} found
-                                    </p>
-                                </div>
+                             {/* Breadcrumb Header */}
+                             <div className="p-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                {breadcrumbs.map((crumb, index) => (
+                                    <React.Fragment key={crumb.id}>
+                                        <button 
+                                            onClick={() => setSelectedFolderId(crumb.id)}
+                                            className={`text-sm font-medium hover:text-cyan-400 transition-colors whitespace-nowrap ${index === breadcrumbs.length - 1 ? 'text-white' : 'text-slate-500'}`}
+                                        >
+                                            {crumb.name}
+                                        </button>
+                                        {index < breadcrumbs.length - 1 && <Icons.ChevronRight size={14} className="text-slate-600 flex-shrink-0"/>}
+                                    </React.Fragment>
+                                ))}
                              </div>
 
                              <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                                {/* Optional: Hero Banner inside content if viewing All Tests */}
-                                {selectedFolderId === 'ALL' && (
-                                    <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border border-indigo-500/20 relative overflow-hidden">
-                                        <div className="relative z-10 flex justify-between items-center">
-                                            <div>
-                                                <h3 className="text-xl font-bold text-white mb-2">Welcome, Aspirant!</h3>
-                                                <p className="text-slate-400 text-sm max-w-md">Select a folder from the sidebar to browse specific topics, or pick a test below to start practicing.</p>
-                                            </div>
-                                            <div className="hidden lg:flex gap-3">
-                                                <div className="px-3 py-1 rounded-full bg-slate-900/50 border border-slate-700 text-xs text-slate-300 flex items-center gap-2"><Icons.Zap size={12}/> Speed</div>
-                                                <div className="px-3 py-1 rounded-full bg-slate-900/50 border border-slate-700 text-xs text-slate-300 flex items-center gap-2"><Icons.Award size={12}/> Accuracy</div>
-                                            </div>
+                                {/* SUBFOLDERS SECTION - Render if there are subfolders */}
+                                {subFolders.length > 0 && (
+                                    <div className="mb-8">
+                                        <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2"><Icons.Folder size={14}/> Subfolders</h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {subFolders.map(sub => (
+                                                <div 
+                                                    key={sub.id} 
+                                                    onClick={() => handleFolderClick(sub.id)}
+                                                    className="p-4 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800 transition-all cursor-pointer group"
+                                                >
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <div className="p-2 rounded-lg bg-indigo-900/30 text-indigo-400 group-hover:text-cyan-400 group-hover:bg-cyan-900/30 transition-colors">
+                                                            <Icons.Folder size={20} />
+                                                        </div>
+                                                        <Icons.ChevronRight size={16} className="ml-auto text-slate-600 group-hover:text-cyan-500 transition-colors" />
+                                                    </div>
+                                                    <h4 className="font-semibold text-slate-200 group-hover:text-white truncate">{sub.name}</h4>
+                                                    <p className="text-xs text-slate-500 mt-1">Click to browse</p>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {filteredTests.length === 0 ? (
-                                        <div className="col-span-full py-20 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/20 text-slate-500">
-                                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600">
-                                                <Icons.BookOpen size={24} />
+                                {/* TESTS SECTION */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2"><Icons.FileText size={14}/> Available Tests</h3>
+                                        <span className="text-xs text-slate-600">{filteredTests.length} items</span>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        {filteredTests.length === 0 ? (
+                                            <div className="col-span-full py-12 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/20 text-slate-500">
+                                                <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-600">
+                                                    <Icons.BookOpen size={20} />
+                                                </div>
+                                                <p className="text-sm font-medium text-slate-400">No tests in this folder.</p>
+                                                {subFolders.length > 0 && <p className="text-xs mt-1">Select a subfolder above.</p>}
                                             </div>
-                                            <p className="text-lg font-medium text-slate-400">No tests available.</p>
-                                            <p className="text-sm mt-2">The database is currently empty.</p>
-                                            {isAdmin && <p className="text-xs text-cyan-500 mt-4">Tip: Upload a test via Admin Panel.</p>}
-                                        </div>
-                                    ) : (
-                                        filteredTests.map(test => (
-                                            <div key={test.id} className="group p-5 rounded-xl glass-card hover:bg-slate-800/90 hover:border-cyan-500/40 transition-all cursor-pointer flex flex-col justify-between h-full border-slate-800" onClick={() => startTest(test)}>
-                                                <div>
-                                                    <div className="flex justify-between items-start mb-3">
-                                                        {test.folderId && folders.find(f => f.id === test.folderId) ? (
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded border border-indigo-500/20">
-                                                                {folders.find(f => f.id === test.folderId).name}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-500 px-2 py-1 rounded border border-slate-700">
-                                                                General
-                                                            </span>
-                                                        )}
-                                                        <div className="w-8 h-8 rounded-full bg-slate-800/50 flex items-center justify-center text-slate-500 group-hover:text-cyan-400 group-hover:bg-cyan-950 transition-colors">
-                                                            <Icons.ChevronRight size={16} />
+                                        ) : (
+                                            filteredTests.map(test => {
+                                                const attempted = attempts && attempts[test.id];
+                                                return (
+                                                    <div key={test.id} className="group p-5 rounded-xl glass-card hover:bg-slate-800/90 hover:border-cyan-500/40 transition-all cursor-pointer flex flex-col justify-between h-full border-slate-800" onClick={() => startTest(test)}>
+                                                        <div>
+                                                            <div className="flex justify-between items-start mb-3">
+                                                                {test.folderId && folders.find(f => f.id === test.folderId) ? (
+                                                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded border border-indigo-500/20">
+                                                                        {folders.find(f => f.id === test.folderId).name}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-500 px-2 py-1 rounded border border-slate-700">
+                                                                        General
+                                                                    </span>
+                                                                )}
+                                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-slate-500 transition-colors ${attempted ? 'bg-green-900/30 text-green-400' : 'bg-slate-800/50 group-hover:text-cyan-400 group-hover:bg-cyan-950'}`}>
+                                                                    {attempted ? <Icons.CheckCircle size={16} /> : <Icons.ChevronRight size={16} />}
+                                                                </div>
+                                                            </div>
+                                                            <h4 className="font-bold text-lg text-slate-200 group-hover:text-cyan-400 transition-colors line-clamp-2 leading-tight mb-4">{test.title}</h4>
+                                                        </div>
+                                                        
+                                                        <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-800/50 text-[11px] font-mono text-slate-400">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-slate-600">Time</span>
+                                                                <span className="flex items-center gap-1.5"><Icons.Clock size={12} className="text-cyan-500"/> {test.duration}m</span>
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-slate-600">Marks</span>
+                                                                <span className="flex items-center gap-1.5"><Icons.Award size={12} className="text-purple-500"/> {test.totalMarks}</span>
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-slate-600">Status</span>
+                                                                <span className={`flex items-center gap-1.5 ${attempted ? 'text-green-500' : 'text-slate-500'}`}>
+                                                                    {attempted ? 'Solved' : 'New'}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <h4 className="font-bold text-lg text-slate-200 group-hover:text-cyan-400 transition-colors line-clamp-2 leading-tight mb-4">{test.title}</h4>
-                                                </div>
-                                                
-                                                <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-800/50 text-[11px] font-mono text-slate-400">
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-slate-600">Time</span>
-                                                        <span className="flex items-center gap-1.5"><Icons.Clock size={12} className="text-cyan-500"/> {test.duration}m</span>
-                                                    </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-slate-600">Marks</span>
-                                                        <span className="flex items-center gap-1.5"><Icons.Award size={12} className="text-purple-500"/> {test.totalMarks}</span>
-                                                    </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-slate-600">Qs</span>
-                                                        <span className="flex items-center gap-1.5"><Icons.FileText size={12} className="text-emerald-500"/> {test.questions.length}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
+                                                );
+                                            })
+                                        )}
+                                    </div>
                                 </div>
                              </div>
                         </main>
@@ -541,7 +596,7 @@
             );
         };
 
-        // 2. ADMIN PANEL (MODIFIED FOR LIVE UPLOAD & DATABASE EXPLORER)
+        // 2. ADMIN PANEL
         const AdminPanel = ({ onUpload, onCancel, onSuccess, folders, onCreateFolder, onDeleteFolder }) => {
             const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'folders' | 'database'
             const [jsonInput, setJsonInput] = useState(''); 
@@ -555,6 +610,7 @@
             
             // Folder Creation State
             const [newFolderName, setNewFolderName] = useState("");
+            const [parentFolderId, setParentFolderId] = useState(""); // For Subfolders
             const [creatingFolder, setCreatingFolder] = useState(false);
 
             // Database Explorer State
@@ -605,7 +661,6 @@
                 setDbLoading(true);
                 try {
                     const { db, doc, deleteDoc } = window.AppFirebase;
-                    // We delete from the local list one by one as batch limits can be tricky in this context
                     const deletePromises = dbDocs.map(d => deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tests', d.id)));
                     await Promise.all(deletePromises);
                     setDbDocs([]);
@@ -621,8 +676,9 @@
                 if(!newFolderName.trim()) return;
                 setCreatingFolder(true);
                 try {
-                    await onCreateFolder(newFolderName);
+                    await onCreateFolder(newFolderName, parentFolderId || null); // Pass parentId
                     setNewFolderName("");
+                    setParentFolderId("");
                 } catch(e) {
                     alert("Failed to create folder: " + e.message);
                 } finally {
@@ -721,6 +777,17 @@
                 }
             };
 
+            // Recursive helper to get full path
+            const getFullPath = (folderId) => {
+                let path = [];
+                let current = folders.find(f => f.id === folderId);
+                while (current) {
+                    path.unshift(current.name);
+                    current = folders.find(f => f.id === current.parentId);
+                }
+                return path.length > 0 ? path.join(" > ") : "";
+            }
+
             return (
                 <div className="min-h-screen bg-slate-950 text-white p-4 flex flex-col items-center justify-center font-sans">
                     <div className="w-full max-w-5xl glass-card rounded-2xl p-8 shadow-2xl relative min-h-[600px] flex flex-col">
@@ -803,7 +870,9 @@
                                         >
                                             <option value="">-- No Folder (Root) --</option>
                                             {folders.map(f => (
-                                                <option key={f.id} value={f.id}>{f.name}</option>
+                                                <option key={f.id} value={f.id}>
+                                                    {getFullPath(f.id)}
+                                                </option>
                                             ))}
                                         </select>
                                     </div>
@@ -882,20 +951,41 @@
                             <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full">
                                 <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 mb-8">
                                     <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2"><Icons.FolderPlus size={18}/> Create New Folder</h3>
-                                    <div className="flex gap-4">
-                                        <input 
-                                            type="text" 
-                                            value={newFolderName}
-                                            onChange={(e) => setNewFolderName(e.target.value)}
-                                            placeholder="e.g., Physics Mechanics, Full Mocks 2024"
-                                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
-                                        />
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs text-slate-500 font-bold uppercase block mb-1">Folder Name</label>
+                                            <input 
+                                                type="text" 
+                                                value={newFolderName}
+                                                onChange={(e) => setNewFolderName(e.target.value)}
+                                                placeholder="e.g., Physics Mechanics, Full Mocks 2024"
+                                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="text-xs text-slate-500 font-bold uppercase block mb-1">Parent Folder (Optional)</label>
+                                            <select 
+                                                value={parentFolderId}
+                                                onChange={(e) => setParentFolderId(e.target.value)}
+                                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                                            >
+                                                <option value="">-- No Parent (Root Folder) --</option>
+                                                {/* MODIFIED: Show all folders with paths for deeper nesting support */}
+                                                {folders.map(f => (
+                                                    <option key={f.id} value={f.id}>
+                                                        {getFullPath(f.id)}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
                                         <button 
                                             onClick={handleCreateFolder}
                                             disabled={!newFolderName.trim() || creatingFolder}
-                                            className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+                                            className="w-full bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
                                         >
-                                            {creatingFolder ? <Icons.Loader className="animate-spin"/> : 'Add Folder'}
+                                            {creatingFolder ? <Icons.Loader className="animate-spin mx-auto"/> : 'Create Folder'}
                                         </button>
                                     </div>
                                 </div>
@@ -906,20 +996,31 @@
                                         <p className="text-slate-500 italic">No folders created yet.</p>
                                     ) : (
                                         <div className="space-y-2">
-                                            {folders.map(folder => (
-                                                <div key={folder.id} className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-lg group hover:border-purple-500/50 transition-colors">
-                                                    <div className="flex items-center gap-3">
-                                                        <Icons.Folder className="text-purple-400" />
-                                                        <span className="font-medium text-slate-200">{folder.name}</span>
+                                            {folders.map(folder => {
+                                                const fullPath = getFullPath(folder.id);
+                                                // Extract just the parent path for display
+                                                const parts = fullPath.split(' > ');
+                                                const displayName = parts.pop();
+                                                const parentPath = parts.join(' > ');
+
+                                                return (
+                                                    <div key={folder.id} className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-lg group hover:border-purple-500/50 transition-colors">
+                                                        <div className="flex items-center gap-3">
+                                                            <Icons.Folder className={parentPath ? "text-cyan-400" : "text-purple-400"} />
+                                                            <div>
+                                                                <span className="font-medium text-slate-200 block">{displayName}</span>
+                                                                {parentPath && <span className="text-[10px] text-slate-500 uppercase tracking-wide">Path: {parentPath}</span>}
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => { if(confirm('Delete this folder?')) onDeleteFolder(folder.id); }}
+                                                            className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            <Icons.Trash size={16} />
+                                                        </button>
                                                     </div>
-                                                    <button 
-                                                        onClick={() => { if(confirm('Delete this folder?')) onDeleteFolder(folder.id); }}
-                                                        className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                                                    >
-                                                        <Icons.Trash size={16} />
-                                                    </button>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -974,7 +1075,7 @@
                                                                     {doc.folderId && folders.find(f => f.id === doc.folderId) && (
                                                                         <>
                                                                             <span>•</span>
-                                                                            <span className="bg-purple-900/30 text-purple-300 px-1.5 rounded">{folders.find(f => f.id === doc.folderId).name}</span>
+                                                                            <span className="bg-purple-900/30 text-purple-300 px-1.5 rounded">{getFullPath(doc.folderId)}</span>
                                                                         </>
                                                                     )}
                                                                 </div>
@@ -1294,8 +1395,9 @@
         };
 
         // 4. RESULTS / ANALYTICS
-        const Analytics = ({ test, results, onHome }) => {
+        const Analytics = ({ test, results, onHome, onReattempt }) => {
             const { answers, status, timeTaken } = results;
+            const [showSolutions, setShowSolutions] = useState(false);
             
             const stats = useMemo(() => {
                 let score = 0;
@@ -1346,9 +1448,14 @@
                                 <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500">Analysis Report</h1>
                                 <p className="text-slate-500 text-sm mt-1">Detailed breakdown of your performance</p>
                             </div>
-                            <button onClick={onHome} className="flex items-center gap-2 px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors border border-slate-700">
-                                <Icons.LogOut size={18} /> Back to Dashboard
-                            </button>
+                            <div className="flex gap-4">
+                                <button onClick={onReattempt} className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white transition-colors shadow-lg shadow-indigo-900/20">
+                                    <Icons.RefreshCw size={18} /> Re-attempt Test
+                                </button>
+                                <button onClick={onHome} className="flex items-center gap-2 px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors border border-slate-700">
+                                    <Icons.LogOut size={18} /> Back to Dashboard
+                                </button>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -1385,7 +1492,7 @@
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
                             <div className="glass-card rounded-2xl p-8 border border-slate-800">
                                 <h3 className="text-xl font-bold mb-8 flex items-center gap-2 text-slate-200">
                                     <Icons.LayoutGrid size={20} className="text-indigo-400" /> Subject-wise Performance
@@ -1429,6 +1536,101 @@
                                 </p>
                             </div>
                         </div>
+
+                        {/* Detailed Solutions Section */}
+                        <div className="glass-card rounded-2xl p-8 border border-slate-800">
+                            <div 
+                                className="flex justify-between items-center cursor-pointer"
+                                onClick={() => setShowSolutions(!showSolutions)}
+                            >
+                                <h3 className="text-xl font-bold text-slate-200 flex items-center gap-2">
+                                    <Icons.FileText size={20} className="text-emerald-400"/> Detailed Solutions & Answers
+                                </h3>
+                                <div className={`transition-transform duration-300 ${showSolutions ? 'rotate-180' : ''}`}>
+                                    <Icons.ChevronDown size={24} className="text-slate-500"/>
+                                </div>
+                            </div>
+                            
+                            {showSolutions && (
+                                <div className="mt-8 space-y-6">
+                                    {test.questions.map((q, idx) => {
+                                        const userAns = answers[q.id];
+                                        let statusColor = "border-slate-800";
+                                        let statusText = "Not Attempted";
+                                        let statusTextColor = "text-slate-500";
+                                        let isCorrect = false;
+
+                                        if(userAns !== undefined) {
+                                            if (q.type === 'MCQ') isCorrect = userAns === q.correct;
+                                            else isCorrect = Math.abs(userAns - q.correct) < 0.1;
+
+                                            if (isCorrect) {
+                                                statusColor = "border-green-500/50 bg-green-900/10";
+                                                statusText = "Correct";
+                                                statusTextColor = "text-green-400";
+                                            } else {
+                                                statusColor = "border-red-500/50 bg-red-900/10";
+                                                statusText = "Incorrect";
+                                                statusTextColor = "text-red-400";
+                                            }
+                                        }
+
+                                        return (
+                                            <div key={q.id} className={`p-6 rounded-xl border ${statusColor} transition-all`}>
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-sm font-bold text-slate-500 bg-slate-900 px-2 py-1 rounded">Q{idx+1}</span>
+                                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{q.subject}</span>
+                                                    </div>
+                                                    <span className={`text-xs font-bold uppercase tracking-wider ${statusTextColor}`}>{statusText}</span>
+                                                </div>
+                                                
+                                                <p className="text-lg text-slate-200 mb-6">{q.text}</p>
+                                                
+                                                <div className="space-y-2">
+                                                    {q.type === 'MCQ' ? (
+                                                        q.options.map((opt, i) => {
+                                                            let optClass = "border-slate-800 bg-slate-900/50 text-slate-400";
+                                                            // Logic for coloring options
+                                                            if (i === q.correct) {
+                                                                optClass = "border-green-500 bg-green-900/20 text-white shadow-[0_0_10px_rgba(34,197,94,0.2)]"; // Correct Answer always green
+                                                            } else if (userAns === i && i !== q.correct) {
+                                                                optClass = "border-red-500 bg-red-900/20 text-white"; // Wrongly selected answer
+                                                            } else if (userAns === i) {
+                                                                // User selected correct (already handled above really, but for clarity)
+                                                                optClass = "border-green-500 bg-green-900/20 text-white"; 
+                                                            }
+
+                                                            return (
+                                                                <div key={i} className={`p-3 rounded-lg border text-sm flex items-center gap-3 ${optClass}`}>
+                                                                    <div className="w-5 h-5 flex items-center justify-center rounded-full border border-current opacity-50 text-xs">{String.fromCharCode(65+i)}</div>
+                                                                    {opt}
+                                                                    {i === q.correct && <Icons.CheckCircle size={16} className="ml-auto text-green-400"/>}
+                                                                    {userAns === i && i !== q.correct && <Icons.XCircle size={16} className="ml-auto text-red-400"/>}
+                                                                </div>
+                                                            )
+                                                        })
+                                                    ) : (
+                                                        <div className="flex gap-8 mt-4">
+                                                            <div>
+                                                                <span className="text-xs text-slate-500 block mb-1">Your Answer</span>
+                                                                <span className={`text-xl font-mono font-bold ${isCorrect ? 'text-green-400' : (userAns !== undefined ? 'text-red-400' : 'text-slate-400')}`}>
+                                                                    {userAns !== undefined ? userAns : '-'}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-xs text-slate-500 block mb-1">Correct Answer</span>
+                                                                <span className="text-xl font-mono font-bold text-green-400">{q.correct}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -1438,6 +1640,7 @@
             const [view, setView] = useState('home'); 
             const [tests, setTests] = useState([]); // Empty initially, populated from Firestore
             const [folders, setFolders] = useState([]);
+            const [attempts, setAttempts] = useState({}); // Map of testId -> attemptData
             const [activeTest, setActiveTest] = useState(null);
             const [testResults, setTestResults] = useState(null);
             const [user, setUser] = useState(null);
@@ -1461,12 +1664,12 @@
                 }
             }, []);
 
-            // Firestore Real-time Listener for Tests AND Folders
+            // Firestore Real-time Listener for Tests, Folders AND User Attempts
             useEffect(() => {
                 if (!user) return; // Only listen if logged in
                 
                 try {
-                    const { db, collection, onSnapshot, query, orderBy } = window.AppFirebase;
+                    const { db, collection, onSnapshot, query, orderBy, doc } = window.AppFirebase;
                     
                     // Listen to 'tests'
                     const qTests = query(
@@ -1497,13 +1700,23 @@
                         }));
                         setFolders(fetchedFolders);
                     }, (error) => {
-                        // Silent fail for folders if collection doesn't exist yet
                         console.log("Folders empty or error:", error); 
+                    });
+
+                    // Listen to User Attempts
+                    const qAttempts = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'attempts');
+                    const unsubscribeAttempts = onSnapshot(qAttempts, (snapshot) => {
+                        const att = {};
+                        snapshot.forEach(doc => {
+                            att[doc.id] = doc.data();
+                        });
+                        setAttempts(att);
                     });
                     
                     return () => {
                         unsubscribeTests();
                         unsubscribeFolders();
+                        unsubscribeAttempts();
                     };
                 } catch(e) {
                     console.error("Firestore Error:", e);
@@ -1512,18 +1725,48 @@
 
             const startTest = (test) => {
                 setActiveTest(test);
-                setView('test');
+                // Check if already attempted
+                if (attempts[test.id]) {
+                    setTestResults(attempts[test.id]);
+                    setView('result');
+                } else {
+                    setTestResults(null);
+                    setView('test');
+                }
             };
 
-            const handleTestSubmit = (results) => {
-                setTestResults(results);
+            const handleTestSubmit = async (results) => {
+                const attemptData = { 
+                    ...results, 
+                    testId: activeTest.id, 
+                    timestamp: Date.now() 
+                };
+                
+                // Save to Firestore
+                try {
+                    const { db, doc, setDoc } = window.AppFirebase;
+                    await setDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'attempts', activeTest.id), attemptData);
+                } catch(e) {
+                    console.error("Failed to save attempt:", e);
+                }
+
+                setTestResults(attemptData);
                 setView('result');
             };
+            
+            const handleReattempt = () => {
+                if(window.confirm("This will start a fresh attempt. Your previous score will be overwritten upon submission. Continue?")) {
+                    setTestResults(null);
+                    setView('test');
+                }
+            };
 
-            const handleCreateFolder = async (folderName) => {
+            // MODIFIED: Create folder accepts ParentID
+            const handleCreateFolder = async (folderName, parentId = null) => {
                 const { db, collection, addDoc } = window.AppFirebase;
                 await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'folders'), {
                     name: folderName,
+                    parentId: parentId, // Store parent reference
                     createdAt: Date.now(),
                     createdBy: user.uid
                 });
@@ -1574,6 +1817,7 @@
                         <Dashboard 
                             tests={tests} 
                             folders={folders}
+                            attempts={attempts}
                             startTest={startTest} 
                             switchMode={() => setView('admin')} 
                             user={user}
@@ -1602,7 +1846,8 @@
                         <Analytics 
                             test={activeTest} 
                             results={testResults} 
-                            onHome={() => { setView('home'); setActiveTest(null); setTestResults(null); }} 
+                            onHome={() => { setView('home'); setActiveTest(null); setTestResults(null); }}
+                            onReattempt={handleReattempt} 
                         />
                     )}
                 </div>
