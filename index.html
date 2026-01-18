@@ -85,7 +85,8 @@
             createUserWithEmailAndPassword, 
             signOut, 
             onAuthStateChanged,
-            signInWithCustomToken
+            signInWithCustomToken,
+            signInAnonymously
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import {
             getFirestore,
@@ -101,7 +102,8 @@
         window.AppFirebase = {};
 
         // --- YOUR FIREBASE CONFIGURATION ---
-        const firebaseConfig = {
+        // This fallback config is used when running locally.
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyAH-Lm5oeYHghir9tK2htaYoj4aRvjqHvA",
             authDomain: "auratest-142d7.firebaseapp.com",
             projectId: "auratest-142d7",
@@ -125,13 +127,27 @@
                 logout: signOut,
                 onAuthChange: onAuthStateChanged,
                 initAuth: async () => {
+                    // Critical: Prioritize Custom Token for Environment compatibility
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         try {
                             await signInWithCustomToken(auth, __initial_auth_token);
+                            console.log("Authenticated with Custom Token");
                         } catch (e) {
-                            console.log("Environment token skipped (Custom project detected). Please log in manually.");
+                            console.error("Token Auth Failed:", e);
                         }
-                    } 
+                    } else {
+                        // Fallback: Running Locally
+                        console.log("Running locally (No custom token found).");
+                        if (!auth.currentUser) {
+                             // Attempt Anonymous login so local testing isn't blocked by auth
+                             try {
+                                 await signInAnonymously(auth);
+                                 console.log("Signed in Anonymously for Local Testing");
+                             } catch(e) {
+                                 console.log("Anonymous auth failed (maybe disabled in console), please log in manually.");
+                             }
+                        }
+                    }
                 },
                 // Firestore Helpers
                 collection,
@@ -142,11 +158,12 @@
                 getDocs
             };
             
+            // Initialize immediately
             window.AppFirebase.initAuth();
             
         } catch (error) {
             console.error("Firebase Initialization Error:", error);
-            alert("Failed to initialize Firebase. Check console for details.");
+            // alert("Failed to initialize Firebase. Check console.");
         }
     </script>
 </head>
@@ -163,7 +180,8 @@
         const ADMIN_UID = "XZ3MBiY8gdU7r6UexqFSX0t1SiI3"; 
 
         // --- GLOBAL APP ID FOR FIRESTORE PATHS ---
-        const APP_ID = "auratest_v1";
+        // CRITICAL: Uses system ID in Canvas, but defaults to 'auratest_v1' locally.
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'auratest_v1';
 
         // --- ICONS ---
         const Icon = ({ path, className, size = 24 }) => (
@@ -531,7 +549,13 @@
             const handleUpload = async () => {
                 try {
                     if (!jsonInput) throw new Error("Please upload a PDF to extract data first.");
-                    const parsed = JSON.parse(jsonInput);
+                    let parsed;
+                    try {
+                        parsed = JSON.parse(jsonInput);
+                    } catch (e) {
+                        throw new Error("Invalid JSON format. Please check the text area.");
+                    }
+
                     if(!parsed.questions || !parsed.subjects) throw new Error("Invalid format: Missing questions or subjects array");
                     
                     setUploading(true);
@@ -1087,11 +1111,15 @@
 
             // Firestore Real-time Listener for Tests
             useEffect(() => {
+                // IMPORTANT: Listen to public data even if not logged in (though we force login here)
+                // If you want normal users to see tests, they must query the PUBLIC path
+                
                 if (!user) return; // Only listen if logged in
                 
                 try {
                     const { db, collection, onSnapshot, query, orderBy } = window.AppFirebase;
                     // Listen to 'tests' subcollection in public data
+                    // Use the Correct APP_ID
                     const q = query(
                         collection(db, 'artifacts', APP_ID, 'public', 'data', 'tests'),
                         orderBy('timestamp', 'desc')
@@ -1124,19 +1152,25 @@
             };
 
             const handleUpload = async (newTest) => {
-                const { db, collection, addDoc } = window.AppFirebase;
-                
-                // Add timestamp for sorting
-                const testData = {
-                    ...newTest,
-                    timestamp: Date.now(),
-                    uploadedBy: user.email
-                };
+                try {
+                    const { db, collection, addDoc } = window.AppFirebase;
+                    
+                    // Add timestamp for sorting
+                    const testData = {
+                        ...newTest,
+                        timestamp: Date.now(),
+                        uploadedBy: user.email
+                    };
 
-                await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'tests'), testData);
-                
-                setView('home');
-                // Success message handled by UI state update via Firestore listener
+                    // Add to PUBLIC data so everyone can see it
+                    await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'tests'), testData);
+                    
+                    setView('home');
+                    alert("Test Published Successfully!");
+                } catch (error) {
+                    console.error("Upload Error:", error);
+                    alert("Failed to upload test: " + error.message);
+                }
             };
 
             if (authLoading) {
