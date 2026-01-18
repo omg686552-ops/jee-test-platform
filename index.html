@@ -102,7 +102,9 @@
         import {
             getFirestore,
             collection,
+            doc,
             addDoc,
+            deleteDoc,
             getDocs,
             onSnapshot,
             query,
@@ -161,7 +163,9 @@
                 },
                 // Firestore Helpers
                 collection,
+                doc,
                 addDoc,
+                deleteDoc,
                 onSnapshot,
                 query,
                 orderBy,
@@ -173,7 +177,6 @@
             
         } catch (error) {
             console.error("Firebase Initialization Error:", error);
-            // alert("Failed to initialize Firebase. Check console.");
         }
     </script>
 </head>
@@ -220,6 +223,9 @@
             Lock: (p) => <Icon {...p} path={<><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>} />,
             ArrowRight: (p) => <Icon {...p} path={<><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>} />,
             CloudUpload: (p) => <Icon {...p} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>} />,
+            Database: (p) => <Icon {...p} path={<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></>} />,
+            Trash: (p) => <Icon {...p} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>} />,
+            Eye: (p) => <Icon {...p} path={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>} />,
         };
 
         const INITIAL_TEST_DATA = {
@@ -505,19 +511,58 @@
             );
         };
 
-        // 2. ADMIN PANEL (MODIFIED FOR LIVE UPLOAD PERCENTAGE)
+        // 2. ADMIN PANEL (MODIFIED FOR LIVE UPLOAD & DATABASE EXPLORER)
         const AdminPanel = ({ onUpload, onCancel, onSuccess }) => {
+            const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'database'
             const [jsonInput, setJsonInput] = useState(''); 
             const [error, setError] = useState(null);
             const [isProcessing, setIsProcessing] = useState(false);
             const [fileName, setFileName] = useState(null);
-            
-            // New State for Live Upload Progress
             const [uploading, setUploading] = useState(false);
             const [uploadProgress, setUploadProgress] = useState(0);
             const [statusText, setStatusText] = useState("Initializing...");
             
+            // Database Explorer State
+            const [dbDocs, setDbDocs] = useState([]);
+            const [dbLoading, setDbLoading] = useState(false);
+            const [expandedDoc, setExpandedDoc] = useState(null);
+
             const fileInputRef = useRef(null);
+
+            // Fetch DB Data when tab switches
+            useEffect(() => {
+                if(activeTab === 'database') {
+                    setDbLoading(true);
+                    const { db, collection, getDocs, query, orderBy } = window.AppFirebase;
+                    const fetchDocs = async () => {
+                        try {
+                            const q = query(
+                                collection(db, 'artifacts', APP_ID, 'public', 'data', 'tests'),
+                                orderBy('timestamp', 'desc')
+                            );
+                            const snapshot = await getDocs(q);
+                            setDbDocs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                        } catch (e) {
+                            console.error("DB Fetch Error:", e);
+                            setError("Failed to fetch database records.");
+                        } finally {
+                            setDbLoading(false);
+                        }
+                    };
+                    fetchDocs();
+                }
+            }, [activeTab]);
+
+            const handleDeleteDoc = async (docId) => {
+                if(!window.confirm("Are you sure you want to permanently delete this test?")) return;
+                try {
+                    const { db, doc, deleteDoc } = window.AppFirebase;
+                    await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tests', docId));
+                    setDbDocs(prev => prev.filter(d => d.id !== docId));
+                } catch(e) {
+                    alert("Delete failed: " + e.message);
+                }
+            };
 
             const handleFileChange = (e) => {
                 const file = e.target.files[0];
@@ -569,43 +614,36 @@
 
                     if(!parsed.questions || !parsed.subjects) throw new Error("Invalid format: Missing questions or subjects array");
                     
-                    // START UPLOAD PROCESS
                     setUploading(true);
                     setError(null);
                     setUploadProgress(0);
                     setStatusText("Validating JSON structure...");
 
-                    // Step 1: Simulated Validation Progress (0 - 30%)
                     for(let i = 0; i <= 30; i+=2) {
                          setUploadProgress(i);
                          await new Promise(r => setTimeout(r, 40));
                     }
                     setStatusText("Compressing Data...");
 
-                     // Step 2: Simulated Compression (30 - 70%)
                     for(let i = 30; i <= 70; i+=3) {
                          setUploadProgress(i);
                          await new Promise(r => setTimeout(r, 50));
                     }
                     setStatusText("Uploading to Firestore...");
 
-                    // Step 3: Simulated Network Upload (70 - 90%)
                     for(let i = 70; i <= 90; i+=1) {
                          setUploadProgress(i);
                          await new Promise(r => setTimeout(r, 80));
                     }
 
-                    // Step 4: Actual Upload Call
                     await onUpload(parsed); 
 
-                    // Step 5: Complete
                     setUploadProgress(100);
                     setStatusText("Publishing Complete!");
                     await new Promise(r => setTimeout(r, 800));
 
                     setUploading(false);
                     onSuccess();
-
                 } catch (e) {
                     setUploading(false);
                     setError(e.message);
@@ -619,124 +657,212 @@
 
             return (
                 <div className="min-h-screen bg-slate-950 text-white p-4 flex flex-col items-center justify-center font-sans">
-                    <div className="w-full max-w-4xl glass-card rounded-2xl p-8 shadow-2xl relative">
+                    <div className="w-full max-w-5xl glass-card rounded-2xl p-8 shadow-2xl relative min-h-[600px] flex flex-col">
                         <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
                             <h2 className="text-2xl font-bold flex items-center gap-3 text-cyan-400">
                                 <Icons.Settings size={24} /> Admin Console
                             </h2>
+                            <div className="flex gap-4">
+                                <button 
+                                    onClick={() => !uploading && setActiveTab('upload')} 
+                                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${activeTab === 'upload' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Upload Test
+                                </button>
+                                <button 
+                                    onClick={() => !uploading && setActiveTab('database')} 
+                                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${activeTab === 'database' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Database Explorer
+                                </button>
+                            </div>
                             {!uploading && (
                                 <button onClick={onCancel} className="text-slate-500 hover:text-white transition-colors"><Icons.XCircle /></button>
                             )}
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Left Side: Upload PDF */}
-                            <div className="md:col-span-1 space-y-4">
-                                <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
-                                    <h3 className="font-bold text-slate-300 mb-2 text-sm uppercase tracking-wider">Step 1: Upload Paper</h3>
-                                    <div 
-                                        onClick={() => !uploading && fileInputRef.current.click()}
-                                        className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all text-center h-48 ${uploading ? 'border-slate-800 opacity-50 cursor-not-allowed' : 'border-slate-700 hover:border-cyan-500 hover:bg-slate-800/50 cursor-pointer'}`}
-                                    >
-                                        <input 
-                                            type="file" 
-                                            accept="application/pdf" 
-                                            ref={fileInputRef} 
-                                            className="hidden" 
-                                            onChange={handleFileChange}
-                                            disabled={uploading}
-                                        />
-                                        {isProcessing ? (
-                                            <div className="flex flex-col items-center gap-3 text-cyan-400">
-                                                <Icons.Loader size={32} className="animate-spin" />
-                                                <span className="text-xs font-mono">Initializing Template...</span>
-                                            </div>
-                                        ) : fileName ? (
-                                            <div className="flex flex-col items-center gap-3 text-green-400">
-                                                <Icons.CheckCircle size={32} />
-                                                <span className="text-xs font-medium break-all">{fileName}</span>
-                                                <span className="text-[10px] text-slate-500">Click to change</span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center gap-3 text-slate-400">
-                                                <Icons.Upload size={32} />
-                                                <span className="text-xs">Drop PDF here or Click</span>
-                                                <span className="text-[10px] text-slate-600">Supports .pdf</span>
-                                            </div>
-                                        )}
+                        {activeTab === 'upload' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
+                                {/* Left Side: Upload PDF */}
+                                <div className="md:col-span-1 space-y-4">
+                                    <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                                        <h3 className="font-bold text-slate-300 mb-2 text-sm uppercase tracking-wider">Step 1: Upload Paper</h3>
+                                        <div 
+                                            onClick={() => !uploading && fileInputRef.current.click()}
+                                            className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all text-center h-48 ${uploading ? 'border-slate-800 opacity-50 cursor-not-allowed' : 'border-slate-700 hover:border-cyan-500 hover:bg-slate-800/50 cursor-pointer'}`}
+                                        >
+                                            <input 
+                                                type="file" 
+                                                accept="application/pdf" 
+                                                ref={fileInputRef} 
+                                                className="hidden" 
+                                                onChange={handleFileChange}
+                                                disabled={uploading}
+                                            />
+                                            {isProcessing ? (
+                                                <div className="flex flex-col items-center gap-3 text-cyan-400">
+                                                    <Icons.Loader size={32} className="animate-spin" />
+                                                    <span className="text-xs font-mono">Initializing Template...</span>
+                                                </div>
+                                            ) : fileName ? (
+                                                <div className="flex flex-col items-center gap-3 text-green-400">
+                                                    <Icons.CheckCircle size={32} />
+                                                    <span className="text-xs font-medium break-all">{fileName}</span>
+                                                    <span className="text-[10px] text-slate-500">Click to change</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-3 text-slate-400">
+                                                    <Icons.Upload size={32} />
+                                                    <span className="text-xs">Drop PDF here or Click</span>
+                                                    <span className="text-[10px] text-slate-600">Supports .pdf</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button onClick={handleLoadDemo} disabled={uploading} className="w-full mt-2 text-xs text-indigo-400 hover:text-indigo-300 underline disabled:opacity-50">Load Demo Data (Testing)</button>
                                     </div>
-                                    <button onClick={handleLoadDemo} disabled={uploading} className="w-full mt-2 text-xs text-indigo-400 hover:text-indigo-300 underline disabled:opacity-50">Load Demo Data (Testing)</button>
-                                </div>
-                            </div>
-                            
-                            {/* Right Side: Verify Data & Progress */}
-                            <div className="md:col-span-2">
-                                <div className="flex flex-col mb-2">
-                                    <div className="flex justify-between items-center">
-                                        <h3 className="font-bold text-slate-300 text-sm uppercase tracking-wider">Step 2: JSON Structure</h3>
-                                        {jsonInput && <span className="text-[10px] text-green-400 bg-green-900/20 px-2 py-0.5 rounded">Template Ready</span>}
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 mt-1">Review the data before publishing to the live server.</p>
                                 </div>
                                 
-                                {uploading ? (
-                                    // LIVE PROGRESS BAR UI
-                                    <div className="w-full h-80 bg-slate-900 border border-slate-700 rounded-xl p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-full h-full bg-cyan-900/5 z-0"></div>
-                                        
-                                        <div className="relative z-10 w-full max-w-sm">
-                                            <div className="flex justify-between text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">
-                                                <span>Progress</span>
-                                                <span className="text-cyan-400">{uploadProgress}%</span>
-                                            </div>
+                                {/* Right Side: Verify Data & Progress */}
+                                <div className="md:col-span-2 flex flex-col">
+                                    <div className="flex flex-col mb-2">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="font-bold text-slate-300 text-sm uppercase tracking-wider">Step 2: JSON Structure</h3>
+                                            {jsonInput && <span className="text-[10px] text-green-400 bg-green-900/20 px-2 py-0.5 rounded">Template Ready</span>}
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 mt-1">Review the data before publishing to the live server.</p>
+                                    </div>
+                                    
+                                    {uploading ? (
+                                        <div className="w-full h-80 bg-slate-900 border border-slate-700 rounded-xl p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-full h-full bg-cyan-900/5 z-0"></div>
                                             
-                                            <div className="h-4 w-full bg-slate-800 rounded-full overflow-hidden shadow-inner border border-slate-700 mb-4">
-                                                <div 
-                                                    className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 animate-stripe transition-all duration-300 ease-out" 
-                                                    style={{ width: `${uploadProgress}%` }}
-                                                ></div>
-                                            </div>
+                                            <div className="relative z-10 w-full max-w-sm">
+                                                <div className="flex justify-between text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">
+                                                    <span>Progress</span>
+                                                    <span className="text-cyan-400">{uploadProgress}%</span>
+                                                </div>
+                                                
+                                                <div className="h-4 w-full bg-slate-800 rounded-full overflow-hidden shadow-inner border border-slate-700 mb-4">
+                                                    <div 
+                                                        className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 animate-stripe transition-all duration-300 ease-out" 
+                                                        style={{ width: `${uploadProgress}%` }}
+                                                    ></div>
+                                                </div>
 
-                                            <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-300">
-                                                {uploadProgress < 100 ? <Icons.Loader size={16} className="animate-spin text-cyan-500"/> : <Icons.CheckCircle size={16} className="text-green-400"/>}
-                                                <span className={uploadProgress === 100 ? "text-green-400" : ""}>{statusText}</span>
+                                                <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-300">
+                                                    {uploadProgress < 100 ? <Icons.Loader size={16} className="animate-spin text-cyan-500"/> : <Icons.CheckCircle size={16} className="text-green-400"/>}
+                                                    <span className={uploadProgress === 100 ? "text-green-400" : ""}>{statusText}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="relative">
-                                        <textarea 
-                                            className="w-full h-80 bg-slate-900 border border-slate-700 rounded-xl p-4 font-mono text-sm text-green-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 resize-none custom-scrollbar"
-                                            value={jsonInput}
-                                            onChange={(e) => setJsonInput(e.target.value)}
-                                            spellCheck="false"
-                                            placeholder="Upload a PDF to generate the test structure template..."
-                                            disabled={isProcessing}
-                                        />
-                                        {!jsonInput && !isProcessing && (
-                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                <span className="text-slate-600 text-sm">Waiting for PDF upload...</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                
-                                {error && <div className="mt-3 p-3 bg-red-900/20 text-red-400 rounded-lg border border-red-900/50 flex items-center gap-2 text-sm"><Icons.AlertCircle size={16}/> {error}</div>}
-                                
-                                {!uploading && (
-                                    <div className="flex justify-end gap-3 mt-4">
-                                        <button onClick={onCancel} className="px-6 py-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">Cancel</button>
-                                        <button 
-                                            onClick={handleUpload} 
-                                            disabled={!jsonInput}
-                                            className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 shadow-lg transition-all transform active:scale-95 ${(!jsonInput) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-900/20'}`}
-                                        >
-                                            <Icons.CloudUpload size={18} /> Publish Test
-                                        </button>
-                                    </div>
-                                )}
+                                    ) : (
+                                        <div className="relative flex-1">
+                                            <textarea 
+                                                className="w-full h-full bg-slate-900 border border-slate-700 rounded-xl p-4 font-mono text-sm text-green-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 resize-none custom-scrollbar"
+                                                value={jsonInput}
+                                                onChange={(e) => setJsonInput(e.target.value)}
+                                                spellCheck="false"
+                                                placeholder="Upload a PDF to generate the test structure template..."
+                                                disabled={isProcessing}
+                                            />
+                                            {!jsonInput && !isProcessing && (
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                    <span className="text-slate-600 text-sm">Waiting for PDF upload...</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {error && <div className="mt-3 p-3 bg-red-900/20 text-red-400 rounded-lg border border-red-900/50 flex items-center gap-2 text-sm"><Icons.AlertCircle size={16}/> {error}</div>}
+                                    
+                                    {!uploading && (
+                                        <div className="flex justify-end gap-3 mt-4">
+                                            <button onClick={onCancel} className="px-6 py-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">Cancel</button>
+                                            <button 
+                                                onClick={handleUpload} 
+                                                disabled={!jsonInput}
+                                                className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 shadow-lg transition-all transform active:scale-95 ${(!jsonInput) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-900/20'}`}
+                                            >
+                                                <Icons.CloudUpload size={18} /> Publish Test
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            // DATABASE EXPLORER TAB
+                            <div className="flex-1 flex flex-col overflow-hidden">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-slate-300 text-sm uppercase tracking-wider flex items-center gap-2">
+                                        <Icons.Database size={16} /> Firestore Records (Tests)
+                                    </h3>
+                                    <span className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded">Collection: artifacts/{APP_ID}/public/data/tests</span>
+                                </div>
+                                
+                                <div className="flex-1 bg-slate-900/50 rounded-xl border border-slate-800 overflow-y-auto custom-scrollbar p-1">
+                                    {dbLoading ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-2">
+                                            <Icons.Loader size={32} className="animate-spin text-indigo-500" />
+                                            <span className="text-xs">Fetching Documents...</span>
+                                        </div>
+                                    ) : dbDocs.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                                            <span className="text-sm">No records found.</span>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1">
+                                            {dbDocs.map((doc, idx) => (
+                                                <div key={doc.id} className="bg-slate-900 border border-slate-800 rounded-lg p-3 hover:border-indigo-500/50 transition-all group">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded bg-indigo-900/20 text-indigo-400 flex items-center justify-center text-xs font-bold border border-indigo-500/20">
+                                                                {idx + 1}
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-medium text-slate-200">{doc.title}</h4>
+                                                                <div className="flex gap-3 text-[10px] text-slate-500 font-mono">
+                                                                    <span>ID: {doc.id}</span>
+                                                                    <span>•</span>
+                                                                    <span>{doc.questions?.length || 0} Questions</span>
+                                                                    <span>•</span>
+                                                                    <span>{new Date(doc.timestamp).toLocaleDateString()}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button 
+                                                                onClick={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
+                                                                className={`p-2 rounded hover:bg-slate-800 transition-colors ${expandedDoc === doc.id ? 'text-indigo-400' : 'text-slate-500'}`}
+                                                                title="View JSON"
+                                                            >
+                                                                <Icons.Eye size={16} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleDeleteDoc(doc.id)}
+                                                                className="p-2 rounded hover:bg-red-900/20 text-slate-500 hover:text-red-400 transition-colors"
+                                                                title="Delete Document"
+                                                            >
+                                                                <Icons.Trash size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {expandedDoc === doc.id && (
+                                                        <div className="mt-3 pt-3 border-t border-slate-800">
+                                                            <div className="relative">
+                                                                <pre className="text-[10px] font-mono text-indigo-300 bg-slate-950 p-3 rounded-lg overflow-x-auto custom-scrollbar">
+                                                                    {JSON.stringify(doc, null, 2)}
+                                                                </pre>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             );
