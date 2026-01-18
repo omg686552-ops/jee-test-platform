@@ -5,17 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AuraTest - JEE Advanced Series</title>
     
-    <!-- React & DOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Tailwind Config -->
     <script>
         tailwind.config = {
             theme: {
@@ -87,7 +83,6 @@
         }
     </style>
 
-    <!-- FIREBASE INITIALIZATION MODULE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
@@ -226,27 +221,12 @@
             Database: (p) => <Icon {...p} path={<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></>} />,
             Trash: (p) => <Icon {...p} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>} />,
             Eye: (p) => <Icon {...p} path={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>} />,
+            Folder: (p) => <Icon {...p} path={<><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></>} />,
+            FolderPlus: (p) => <Icon {...p} path={<><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></>} />,
+            Layers: (p) => <Icon {...p} path={<><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>} />,
         };
 
-        const INITIAL_TEST_DATA = {
-            id: "jee-mains-mock-demo",
-            title: "JEE Mains Demo (Default)",
-            duration: 180, 
-            totalMarks: 300,
-            subjects: ["Physics", "Chemistry", "Mathematics"],
-            questions: [
-                { id: 1, subject: "Physics", type: "MCQ", text: "A particle moves with simple harmonic motion in a straight line. In first τ s, after starting from rest it travels a distance a, and in next τ s it travels 2a, in same direction, then:", options: ["Amplitude of motion is 3a", "Time period of oscillations is 8τ", "Amplitude of motion is 4a", "Time period of oscillations is 6τ"], correct: 3 },
-                { id: 2, subject: "Physics", type: "MCQ", text: "Two long current carrying parallel conductors are located at a distance 2d from each other. They carry current I in opposite directions. The magnetic field at a point midway between them is:", options: ["0", "μ₀I / πd", "μ₀I / 2πd", "2μ₀I / πd"], correct: 1 },
-                { id: 3, subject: "Physics", type: "NUMERIC", text: "A capacitor of capacitance C = 900 pF is charged fully by 100 V battery B. Then it is disconnected from the battery and connected to another uncharged capacitor of capacitance C = 900 pF. The electrostatic energy stored by the system (in μJ) is:", correct: 2.25 },
-                { id: 4, subject: "Chemistry", type: "MCQ", text: "Which of the following sets of quantum numbers is NOT permissible?", options: ["n=2, l=0, m=0, s=+1/2", "n=2, l=2, m=1, s=-1/2", "n=3, l=2, m=-2, s=+1/2", "n=3, l=1, m=-1, s=-1/2"], correct: 1 },
-                { id: 5, subject: "Chemistry", type: "MCQ", text: "The correct order of increasing thermal stability of K2CO3, MgCO3, CaCO3 and BeCO3 is:", options: ["BeCO3 < MgCO3 < K2CO3 < CaCO3", "BeCO3 < MgCO3 < CaCO3 < K2CO3", "MgCO3 < BeCO3 < CaCO3 < K2CO3", "K2CO3 < MgCO3 < CaCO3 < BeCO3"], correct: 1 },
-                { id: 6, subject: "Chemistry", type: "NUMERIC", text: "How many grams of methyl alcohol should be added to 10 liters of water to lower its freezing point by 10°C? (Kf for water is 1.86°C kg/mol). Answer to nearest integer.", correct: 1720 },
-                { id: 7, subject: "Mathematics", type: "MCQ", text: "If the system of linear equations x + y + z = 5, x + 2y + 3z = 9, x + 3y + αz = β has infinitely many solutions, then β - α equals:", options: ["5", "18", "21", "8"], correct: 3 },
-                { id: 8, subject: "Mathematics", type: "MCQ", text: "The number of integral values of k for which the line 3x + 4y = k intersects the circle x² + y² - 2x - 4y + 4 = 0 at two distinct points is:", options: ["7", "8", "9", "5"], correct: 2 },
-                { id: 9, subject: "Mathematics", type: "NUMERIC", text: "Let f(x) be a polynomial of degree 3 such that f(-1) = 10, f(1) = -6, f(x) has a critical point at x = -1 and f'(x) has a critical point at x = 1. Then f(x) has a local minima at x = ?", correct: 3 },
-            ]
-        };
-
+       
         const formatTime = (seconds) => {
             const h = Math.floor(seconds / 3600);
             const m = Math.floor((seconds % 3600) / 60);
@@ -378,142 +358,191 @@
         };
 
         // 1. DASHBOARD
-        const Dashboard = ({ tests, startTest, switchMode, user }) => {
+        const Dashboard = ({ tests, startTest, switchMode, user, folders }) => {
             const isAdmin = user && user.uid === ADMIN_UID;
+            const [selectedFolderId, setSelectedFolderId] = useState('ALL');
+
+            // Filter tests based on selected folder
+            const filteredTests = useMemo(() => {
+                if (selectedFolderId === 'ALL') return tests;
+                return tests.filter(t => t.folderId === selectedFolderId);
+            }, [tests, selectedFolderId]);
 
             return (
-                <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 font-sans selection:bg-cyan-500 selection:text-white">
-                    <header className="flex justify-between items-center mb-12">
+                <div className="min-h-screen bg-slate-950 text-white p-4 md:p-6 font-sans selection:bg-cyan-500 selection:text-white flex flex-col h-screen overflow-hidden">
+                    <header className="flex justify-between items-center mb-6 shrink-0">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                                <Icons.Cpu size={28} className="text-white" />
+                            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                                <Icons.Cpu size={22} className="text-white" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
+                                <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
                                     AuraTest
                                 </h1>
-                                <div className="text-xs text-slate-500 font-mono tracking-widest uppercase">
+                                <div className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">
                                     {isAdmin ? 'Administrator Access' : 'JEE Advanced Platform'}
                                 </div>
                             </div>
                         </div>
                         
                         <div className="flex items-center gap-4">
-                            <div className="hidden md:flex items-center gap-2 text-sm text-slate-400 bg-slate-900 py-1.5 px-3 rounded-full border border-slate-800">
-                               <Icons.User size={14} /> {user?.email}
+                            <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-900 py-1.5 px-3 rounded-full border border-slate-800">
+                               <Icons.User size={12} /> {user?.email}
                             </div>
                             
                             {/* ADMIN BUTTON - CONDITIONALLY RENDERED */}
                             {isAdmin && (
                                 <button 
                                     onClick={switchMode}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-900/40 hover:bg-indigo-900/60 transition-all border border-indigo-500/40 text-indigo-300 text-sm font-medium hover:text-white hover:border-indigo-400"
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-900/40 hover:bg-indigo-900/60 transition-all border border-indigo-500/40 text-indigo-300 text-xs font-medium hover:text-white hover:border-indigo-400"
                                 >
-                                    <Icons.Settings size={16} /> Admin Panel
+                                    <Icons.Settings size={14} /> Admin
                                 </button>
                             )}
 
                             <button 
                                 onClick={() => window.AppFirebase.logout(window.AppFirebase.auth)}
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-900/10 hover:bg-red-900/30 transition-all border border-red-900/20 text-red-400 text-sm font-medium"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-900/10 hover:bg-red-900/30 transition-all border border-red-900/20 text-red-400 text-xs font-medium"
                             >
-                                <Icons.LogOut size={16} /> Sign Out
+                                <Icons.LogOut size={14} /> <span className="hidden md:inline">Sign Out</span>
                             </button>
                         </div>
                     </header>
 
-                    <div className="max-w-7xl mx-auto">
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-                            <div className="lg:col-span-2 space-y-8">
-                                {/* Hero Banner */}
-                                <div className="p-8 rounded-3xl bg-gradient-to-br from-indigo-900/40 to-slate-900/40 border border-indigo-500/20 backdrop-blur-xl relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl -mr-20 -mt-20 transition-all group-hover:bg-indigo-500/30"></div>
-                                    <div className="relative z-10">
-                                        <h2 className="text-4xl font-bold mb-4 text-white">Ready to conquer <br/><span className="text-indigo-400">JEE Mains?</span></h2>
-                                        <p className="text-slate-400 mb-8 max-w-md text-lg leading-relaxed">Access premium mock tests designed by top educators. Real-time analysis, NTA-style marking scheme.</p>
-                                        <div className="flex gap-6">
-                                            <div className="flex items-center gap-2 text-cyan-400 bg-cyan-950/30 px-3 py-1 rounded-full border border-cyan-500/20">
-                                                <Icons.Zap size={18} /> <span className="text-sm font-semibold">High Yield</span>
+                    <div className="flex flex-1 gap-6 overflow-hidden max-w-7xl mx-auto w-full">
+                        {/* VERTICAL FOLDER SIDEBAR */}
+                        <aside className="w-16 md:w-64 flex flex-col gap-4 bg-slate-900/30 border-r border-slate-800/50 md:bg-transparent md:border-none shrink-0 py-2">
+                             <div className="hidden md:flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-wider px-2">
+                                <Icons.Layers size={14}/> Categories
+                             </div>
+
+                             <div className="flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-2">
+                                <button 
+                                    onClick={() => setSelectedFolderId('ALL')}
+                                    className={`w-full text-left px-3 md:px-4 py-3 rounded-xl transition-all flex items-center gap-3 group ${selectedFolderId === 'ALL' 
+                                        ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-900/20' 
+                                        : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                                >
+                                    <div className={`p-1.5 rounded-lg ${selectedFolderId === 'ALL' ? 'bg-white/20' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
+                                        <Icons.LayoutGrid size={16} />
+                                    </div>
+                                    <div className="hidden md:block">
+                                        <div className="text-sm font-semibold">All Tests</div>
+                                        <div className="text-[10px] opacity-70">View everything</div>
+                                    </div>
+                                </button>
+
+                                {folders.map(folder => (
+                                    <button 
+                                        key={folder.id}
+                                        onClick={() => setSelectedFolderId(folder.id)}
+                                        className={`w-full text-left px-3 md:px-4 py-3 rounded-xl transition-all flex items-center gap-3 group ${selectedFolderId === folder.id 
+                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20 border border-indigo-500/50' 
+                                            : 'hover:bg-slate-800 text-slate-400 hover:text-white border border-transparent'}`}
+                                    >
+                                        <div className={`p-1.5 rounded-lg ${selectedFolderId === folder.id ? 'bg-white/20' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
+                                            <Icons.Folder size={16} />
+                                        </div>
+                                        <div className="hidden md:block truncate">
+                                            <div className="text-sm font-semibold truncate">{folder.name}</div>
+                                            <div className="text-[10px] opacity-70">Folder</div>
+                                        </div>
+                                    </button>
+                                ))}
+                             </div>
+                        </aside>
+
+                        {/* MAIN CONTENT AREA */}
+                        <main className="flex-1 flex flex-col overflow-hidden bg-slate-900/20 rounded-2xl border border-slate-800/50 relative">
+                             {/* Header inside main content */}
+                             <div className="p-6 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10 flex justify-between items-end">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                                        {selectedFolderId === 'ALL' ? 'All Available Tests' : 
+                                         folders.find(f => f.id === selectedFolderId)?.name || 'Selected Folder'}
+                                    </h2>
+                                    <p className="text-slate-500 text-sm mt-1">
+                                        {filteredTests.length} {filteredTests.length === 1 ? 'test' : 'tests'} found
+                                    </p>
+                                </div>
+                             </div>
+
+                             <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                                {/* Optional: Hero Banner inside content if viewing All Tests */}
+                                {selectedFolderId === 'ALL' && (
+                                    <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border border-indigo-500/20 relative overflow-hidden">
+                                        <div className="relative z-10 flex justify-between items-center">
+                                            <div>
+                                                <h3 className="text-xl font-bold text-white mb-2">Welcome, Aspirant!</h3>
+                                                <p className="text-slate-400 text-sm max-w-md">Select a folder from the sidebar to browse specific topics, or pick a test below to start practicing.</p>
                                             </div>
-                                            <div className="flex items-center gap-2 text-purple-400 bg-purple-950/30 px-3 py-1 rounded-full border border-purple-500/20">
-                                                <Icons.Award size={18} /> <span className="text-sm font-semibold">Live Analysis</span>
+                                            <div className="hidden lg:flex gap-3">
+                                                <div className="px-3 py-1 rounded-full bg-slate-900/50 border border-slate-700 text-xs text-slate-300 flex items-center gap-2"><Icons.Zap size={12}/> Speed</div>
+                                                <div className="px-3 py-1 rounded-full bg-slate-900/50 border border-slate-700 text-xs text-slate-300 flex items-center gap-2"><Icons.Award size={12}/> Accuracy</div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
-                                {/* Test List */}
-                                <div>
-                                    <h3 className="text-xl font-semibold mb-6 flex items-center gap-2 text-slate-200">
-                                        <Icons.BookOpen size={20} className="text-cyan-500" /> Available Tests
-                                    </h3>
-                                    <div className="grid gap-4">
-                                        {tests.length === 0 ? (
-                                            <div className="p-10 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/20 text-slate-500">
-                                                <p>No tests available at the moment.</p>
-                                                {isAdmin && <p className="text-sm text-cyan-500 mt-2">Go to Admin Panel to upload one.</p>}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {filteredTests.length === 0 ? (
+                                        <div className="col-span-full py-20 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/20 text-slate-500">
+                                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600">
+                                                <Icons.BookOpen size={24} />
                                             </div>
-                                        ) : (
-                                            tests.map(test => (
-                                                <div key={test.id} className="group p-6 rounded-2xl glass-card hover:bg-slate-800/80 hover:border-cyan-500/50 transition-all cursor-pointer flex justify-between items-center" onClick={() => startTest(test)}>
-                                                    <div>
-                                                        <h4 className="font-bold text-xl text-slate-200 group-hover:text-cyan-400 transition-colors">{test.title}</h4>
-                                                        <div className="flex gap-6 mt-3 text-sm text-slate-400 font-mono">
-                                                            <span className="flex items-center gap-2"><Icons.Clock size={14} /> {test.duration} MINS</span>
-                                                            <span className="flex items-center gap-2"><Icons.CheckCircle size={14} /> {test.totalMarks} MARKS</span>
-                                                            <span className="flex items-center gap-2"><Icons.FileText size={14} /> {test.questions.length} Qs</span>
+                                            <p className="text-lg font-medium text-slate-400">No tests found here.</p>
+                                            <p className="text-sm mt-2">Try selecting a different folder.</p>
+                                            {isAdmin && <p className="text-xs text-cyan-500 mt-4">Tip: Upload a test via Admin Panel.</p>}
+                                        </div>
+                                    ) : (
+                                        filteredTests.map(test => (
+                                            <div key={test.id} className="group p-5 rounded-xl glass-card hover:bg-slate-800/90 hover:border-cyan-500/40 transition-all cursor-pointer flex flex-col justify-between h-full border-slate-800" onClick={() => startTest(test)}>
+                                                <div>
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        {test.folderId && folders.find(f => f.id === test.folderId) ? (
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded border border-indigo-500/20">
+                                                                {folders.find(f => f.id === test.folderId).name}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-500 px-2 py-1 rounded border border-slate-700">
+                                                                General
+                                                            </span>
+                                                        )}
+                                                        <div className="w-8 h-8 rounded-full bg-slate-800/50 flex items-center justify-center text-slate-500 group-hover:text-cyan-400 group-hover:bg-cyan-950 transition-colors">
+                                                            <Icons.ChevronRight size={16} />
                                                         </div>
                                                     </div>
-                                                    <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center group-hover:bg-cyan-500 group-hover:text-black group-hover:border-cyan-400 transition-all shadow-lg">
-                                                        <Icons.ChevronRight size={24} />
+                                                    <h4 className="font-bold text-lg text-slate-200 group-hover:text-cyan-400 transition-colors line-clamp-2 leading-tight mb-4">{test.title}</h4>
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-800/50 text-[11px] font-mono text-slate-400">
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-slate-600">Time</span>
+                                                        <span className="flex items-center gap-1.5"><Icons.Clock size={12} className="text-cyan-500"/> {test.duration}m</span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-slate-600">Marks</span>
+                                                        <span className="flex items-center gap-1.5"><Icons.Award size={12} className="text-purple-500"/> {test.totalMarks}</span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-slate-600">Qs</span>
+                                                        <span className="flex items-center gap-1.5"><Icons.FileText size={12} className="text-emerald-500"/> {test.questions.length}</span>
                                                     </div>
                                                 </div>
-                                            ))
-                                        )}
-                                    </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
-                            </div>
-
-                            {/* Sidebar Stats */}
-                            <div className="space-y-6">
-                                <div className="p-6 rounded-2xl glass-card border border-slate-800">
-                                    <h3 className="font-semibold mb-6 text-slate-200 flex items-center gap-2"><Icons.LayoutGrid size={18} /> Subject Mastery</h3>
-                                    <div className="space-y-6">
-                                        <div>
-                                            <div className="flex justify-between text-xs font-bold uppercase text-slate-500 mb-2"><span>Physics</span> <span>0%</span></div>
-                                            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[0%] bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)] transition-all duration-1000"></div></div>
-                                        </div>
-                                        <div>
-                                            <div className="flex justify-between text-xs font-bold uppercase text-slate-500 mb-2"><span>Chemistry</span> <span>0%</span></div>
-                                            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[0%] bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)] transition-all duration-1000"></div></div>
-                                        </div>
-                                        <div>
-                                            <div className="flex justify-between text-xs font-bold uppercase text-slate-500 mb-2"><span>Mathematics</span> <span>0%</span></div>
-                                            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[0%] bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.5)] transition-all duration-1000"></div></div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="p-6 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 text-center relative overflow-hidden">
-                                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-                                    <div className="relative z-10">
-                                        <div className="w-16 h-16 mx-auto bg-slate-800 rounded-full flex items-center justify-center mb-4 border border-slate-700 shadow-inner">
-                                            <span className="text-3xl grayscale opacity-50">🔥</span>
-                                        </div>
-                                        <h4 className="font-bold text-white text-lg">Daily Streak</h4>
-                                        <p className="text-slate-500 text-sm mt-2">Complete your first test to start your streak!</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                             </div>
+                        </main>
                     </div>
                 </div>
             );
         };
 
         // 2. ADMIN PANEL (MODIFIED FOR LIVE UPLOAD & DATABASE EXPLORER)
-        const AdminPanel = ({ onUpload, onCancel, onSuccess }) => {
-            const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'database'
+        const AdminPanel = ({ onUpload, onCancel, onSuccess, folders, onCreateFolder, onDeleteFolder }) => {
+            const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'folders' | 'database'
             const [jsonInput, setJsonInput] = useState(''); 
             const [error, setError] = useState(null);
             const [isProcessing, setIsProcessing] = useState(false);
@@ -521,7 +550,12 @@
             const [uploading, setUploading] = useState(false);
             const [uploadProgress, setUploadProgress] = useState(0);
             const [statusText, setStatusText] = useState("Initializing...");
+            const [selectedFolderId, setSelectedFolderId] = useState("");
             
+            // Folder Creation State
+            const [newFolderName, setNewFolderName] = useState("");
+            const [creatingFolder, setCreatingFolder] = useState(false);
+
             // Database Explorer State
             const [dbDocs, setDbDocs] = useState([]);
             const [dbLoading, setDbLoading] = useState(false);
@@ -563,6 +597,19 @@
                     alert("Delete failed: " + e.message);
                 }
             };
+
+            const handleCreateFolder = async () => {
+                if(!newFolderName.trim()) return;
+                setCreatingFolder(true);
+                try {
+                    await onCreateFolder(newFolderName);
+                    setNewFolderName("");
+                } catch(e) {
+                    alert("Failed to create folder: " + e.message);
+                } finally {
+                    setCreatingFolder(false);
+                }
+            }
 
             const handleFileChange = (e) => {
                 const file = e.target.files[0];
@@ -614,6 +661,11 @@
 
                     if(!parsed.questions || !parsed.subjects) throw new Error("Invalid format: Missing questions or subjects array");
                     
+                    // Attach Folder ID
+                    if(selectedFolderId) {
+                        parsed.folderId = selectedFolderId;
+                    }
+
                     setUploading(true);
                     setError(null);
                     setUploadProgress(0);
@@ -650,11 +702,6 @@
                 }
             };
 
-            const handleLoadDemo = () => {
-                setJsonInput(JSON.stringify(INITIAL_TEST_DATA, null, 2));
-                setFileName("Demo_Test.pdf (Simulated)");
-            };
-
             return (
                 <div className="min-h-screen bg-slate-950 text-white p-4 flex flex-col items-center justify-center font-sans">
                     <div className="w-full max-w-5xl glass-card rounded-2xl p-8 shadow-2xl relative min-h-[600px] flex flex-col">
@@ -670,6 +717,12 @@
                                     Upload Test
                                 </button>
                                 <button 
+                                    onClick={() => !uploading && setActiveTab('folders')} 
+                                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${activeTab === 'folders' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Manage Folders
+                                </button>
+                                <button 
                                     onClick={() => !uploading && setActiveTab('database')} 
                                     className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${activeTab === 'database' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
                                 >
@@ -681,7 +734,7 @@
                             )}
                         </div>
                         
-                        {activeTab === 'upload' ? (
+                        {activeTab === 'upload' && (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
                                 {/* Left Side: Upload PDF */}
                                 <div className="md:col-span-1 space-y-4">
@@ -718,7 +771,22 @@
                                                 </div>
                                             )}
                                         </div>
-                                        <button onClick={handleLoadDemo} disabled={uploading} className="w-full mt-2 text-xs text-indigo-400 hover:text-indigo-300 underline disabled:opacity-50">Load Demo Data (Testing)</button>
+                                    </div>
+
+                                    {/* FOLDER SELECTION */}
+                                    <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                                        <h3 className="font-bold text-slate-300 mb-2 text-sm uppercase tracking-wider">Step 2: Select Folder</h3>
+                                        <select 
+                                            value={selectedFolderId}
+                                            onChange={(e) => setSelectedFolderId(e.target.value)}
+                                            disabled={uploading}
+                                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                                        >
+                                            <option value="">-- No Folder (Root) --</option>
+                                            {folders.map(f => (
+                                                <option key={f.id} value={f.id}>{f.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
                                 
@@ -726,7 +794,7 @@
                                 <div className="md:col-span-2 flex flex-col">
                                     <div className="flex flex-col mb-2">
                                         <div className="flex justify-between items-center">
-                                            <h3 className="font-bold text-slate-300 text-sm uppercase tracking-wider">Step 2: JSON Structure</h3>
+                                            <h3 className="font-bold text-slate-300 text-sm uppercase tracking-wider">Step 3: JSON Structure</h3>
                                             {jsonInput && <span className="text-[10px] text-green-400 bg-green-900/20 px-2 py-0.5 rounded">Template Ready</span>}
                                         </div>
                                         <p className="text-[11px] text-slate-500 mt-1">Review the data before publishing to the live server.</p>
@@ -789,7 +857,57 @@
                                     )}
                                 </div>
                             </div>
-                        ) : (
+                        )}
+
+                        {activeTab === 'folders' && (
+                            <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full">
+                                <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 mb-8">
+                                    <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2"><Icons.FolderPlus size={18}/> Create New Folder</h3>
+                                    <div className="flex gap-4">
+                                        <input 
+                                            type="text" 
+                                            value={newFolderName}
+                                            onChange={(e) => setNewFolderName(e.target.value)}
+                                            placeholder="e.g., Physics Mechanics, Full Mocks 2024"
+                                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                                        />
+                                        <button 
+                                            onClick={handleCreateFolder}
+                                            disabled={!newFolderName.trim() || creatingFolder}
+                                            className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+                                        >
+                                            {creatingFolder ? <Icons.Loader className="animate-spin"/> : 'Add Folder'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                    <h3 className="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3">Existing Folders</h3>
+                                    {folders.length === 0 ? (
+                                        <p className="text-slate-500 italic">No folders created yet.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {folders.map(folder => (
+                                                <div key={folder.id} className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-lg group hover:border-purple-500/50 transition-colors">
+                                                    <div className="flex items-center gap-3">
+                                                        <Icons.Folder className="text-purple-400" />
+                                                        <span className="font-medium text-slate-200">{folder.name}</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => { if(confirm('Delete this folder?')) onDeleteFolder(folder.id); }}
+                                                        className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                    >
+                                                        <Icons.Trash size={16} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'database' && (
                             // DATABASE EXPLORER TAB
                             <div className="flex-1 flex flex-col overflow-hidden">
                                 <div className="flex justify-between items-center mb-4">
@@ -820,12 +938,16 @@
                                                             </div>
                                                             <div>
                                                                 <h4 className="text-sm font-medium text-slate-200">{doc.title}</h4>
-                                                                <div className="flex gap-3 text-[10px] text-slate-500 font-mono">
+                                                                <div className="flex gap-3 text-[10px] text-slate-500 font-mono items-center">
                                                                     <span>ID: {doc.id}</span>
                                                                     <span>•</span>
-                                                                    <span>{doc.questions?.length || 0} Questions</span>
-                                                                    <span>•</span>
                                                                     <span>{new Date(doc.timestamp).toLocaleDateString()}</span>
+                                                                    {doc.folderId && folders.find(f => f.id === doc.folderId) && (
+                                                                        <>
+                                                                            <span>•</span>
+                                                                            <span className="bg-purple-900/30 text-purple-300 px-1.5 rounded">{folders.find(f => f.id === doc.folderId).name}</span>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1286,6 +1408,7 @@
         const App = () => {
             const [view, setView] = useState('home'); 
             const [tests, setTests] = useState([]); // Empty initially, populated from Firestore
+            const [folders, setFolders] = useState([]);
             const [activeTest, setActiveTest] = useState(null);
             const [testResults, setTestResults] = useState(null);
             const [user, setUser] = useState(null);
@@ -1301,7 +1424,6 @@
                         
                         if(currentUser) {
                             console.log("%c 🔑 YOUR USER ID: " + currentUser.uid, "color: cyan; font-size: 16px; font-weight: bold;");
-                            console.log("Copy this ID and paste it into the ADMIN_UID variable in the code.");
                         }
                     });
                     return () => unsubscribe();
@@ -1310,23 +1432,20 @@
                 }
             }, []);
 
-            // Firestore Real-time Listener for Tests
+            // Firestore Real-time Listener for Tests AND Folders
             useEffect(() => {
-                // IMPORTANT: Listen to public data even if not logged in (though we force login here)
-                // If you want normal users to see tests, they must query the PUBLIC path
-                
                 if (!user) return; // Only listen if logged in
                 
                 try {
                     const { db, collection, onSnapshot, query, orderBy } = window.AppFirebase;
-                    // Listen to 'tests' subcollection in public data
-                    // Use the Correct APP_ID
-                    const q = query(
+                    
+                    // Listen to 'tests'
+                    const qTests = query(
                         collection(db, 'artifacts', APP_ID, 'public', 'data', 'tests'),
                         orderBy('timestamp', 'desc')
                     );
                     
-                    const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const unsubscribeTests = onSnapshot(qTests, (snapshot) => {
                         const fetchedTests = snapshot.docs.map(doc => ({
                             id: doc.id,
                             ...doc.data()
@@ -1335,8 +1454,28 @@
                     }, (error) => {
                         console.error("Error fetching tests:", error);
                     });
+
+                    // Listen to 'folders'
+                    const qFolders = query(
+                        collection(db, 'artifacts', APP_ID, 'public', 'data', 'folders'),
+                        orderBy('createdAt', 'desc')
+                    );
+
+                    const unsubscribeFolders = onSnapshot(qFolders, (snapshot) => {
+                        const fetchedFolders = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        setFolders(fetchedFolders);
+                    }, (error) => {
+                        // Silent fail for folders if collection doesn't exist yet
+                        console.log("Folders empty or error:", error); 
+                    });
                     
-                    return () => unsubscribe();
+                    return () => {
+                        unsubscribeTests();
+                        unsubscribeFolders();
+                    };
                 } catch(e) {
                     console.error("Firestore Error:", e);
                 }
@@ -1352,20 +1491,28 @@
                 setView('result');
             };
 
+            const handleCreateFolder = async (folderName) => {
+                const { db, collection, addDoc } = window.AppFirebase;
+                await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'folders'), {
+                    name: folderName,
+                    createdAt: Date.now(),
+                    createdBy: user.uid
+                });
+            }
+
+            const handleDeleteFolder = async (folderId) => {
+                const { db, doc, deleteDoc } = window.AppFirebase;
+                await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'folders', folderId));
+            }
+
             const handleUpload = async (newTest) => {
-                // Returns a Promise, does NOT switch view immediately
-                // This allows the AdminPanel to show progress and then call success callback
                 try {
                     const { db, collection, addDoc } = window.AppFirebase;
-                    
-                    // Add timestamp for sorting
                     const testData = {
                         ...newTest,
                         timestamp: Date.now(),
                         uploadedBy: user.email
                     };
-
-                    // Add to PUBLIC data so everyone can see it
                     await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'tests'), testData);
                     return true;
                 } catch (error) {
@@ -1387,7 +1534,6 @@
                 return <Login />;
             }
 
-            // Route Guard for Admin
             if(view === 'admin' && user.uid !== ADMIN_UID) {
                 setView('home');
                 return null;
@@ -1398,6 +1544,7 @@
                     {view === 'home' && (
                         <Dashboard 
                             tests={tests} 
+                            folders={folders}
                             startTest={startTest} 
                             switchMode={() => setView('admin')} 
                             user={user}
@@ -1407,6 +1554,9 @@
                     {view === 'admin' && (
                         <AdminPanel 
                             onUpload={handleUpload} 
+                            onCreateFolder={handleCreateFolder}
+                            onDeleteFolder={handleDeleteFolder}
+                            folders={folders}
                             onCancel={() => setView('home')} 
                             onSuccess={() => setView('home')}
                         />
