@@ -188,7 +188,8 @@
         const ADMIN_UID = "XZ3MBiY8gdU7r6UexqFSX0t1SiI3"; 
 
         // --- GLOBAL APP ID FOR FIRESTORE PATHS ---
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'auratest_v1';
+        // CHANGED: Added '_clean_v2' to give a fresh start with no demo data
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'auratest_clean_v2';
 
         // --- ICONS ---
         const Icon = ({ path, className, size = 24 }) => (
@@ -490,8 +491,8 @@
                                             <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600">
                                                 <Icons.BookOpen size={24} />
                                             </div>
-                                            <p className="text-lg font-medium text-slate-400">No tests found here.</p>
-                                            <p className="text-sm mt-2">Try selecting a different folder.</p>
+                                            <p className="text-lg font-medium text-slate-400">No tests available.</p>
+                                            <p className="text-sm mt-2">The database is currently empty.</p>
                                             {isAdmin && <p className="text-xs text-cyan-500 mt-4">Tip: Upload a test via Admin Panel.</p>}
                                         </div>
                                     ) : (
@@ -595,6 +596,24 @@
                     setDbDocs(prev => prev.filter(d => d.id !== docId));
                 } catch(e) {
                     alert("Delete failed: " + e.message);
+                }
+            };
+
+            const handleDeleteAll = async () => {
+                if(!window.confirm("DANGER: This will permanently delete ALL tests from the database. Are you absolutely sure?")) return;
+                
+                setDbLoading(true);
+                try {
+                    const { db, doc, deleteDoc } = window.AppFirebase;
+                    // We delete from the local list one by one as batch limits can be tricky in this context
+                    const deletePromises = dbDocs.map(d => deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tests', d.id)));
+                    await Promise.all(deletePromises);
+                    setDbDocs([]);
+                    alert("All tests have been deleted.");
+                } catch(e) {
+                    alert("Failed to delete all: " + e.message);
+                } finally {
+                    setDbLoading(false);
                 }
             };
 
@@ -914,7 +933,17 @@
                                     <h3 className="font-bold text-slate-300 text-sm uppercase tracking-wider flex items-center gap-2">
                                         <Icons.Database size={16} /> Firestore Records (Tests)
                                     </h3>
-                                    <span className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded">Collection: artifacts/{APP_ID}/public/data/tests</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded hidden md:inline-block">Collection: artifacts/{APP_ID}/public/data/tests</span>
+                                        {dbDocs.length > 0 && (
+                                            <button 
+                                                onClick={handleDeleteAll}
+                                                className="bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs px-3 py-1 rounded border border-red-500/30 flex items-center gap-1 transition-colors"
+                                            >
+                                                <Icons.Trash size={12}/> Delete All Tests
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                                 
                                 <div className="flex-1 bg-slate-900/50 rounded-xl border border-slate-800 overflow-y-auto custom-scrollbar p-1">
