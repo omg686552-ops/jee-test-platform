@@ -101,6 +101,7 @@
             addDoc,
             setDoc,
             deleteDoc,
+            updateDoc,
             getDocs,
             onSnapshot,
             query,
@@ -135,7 +136,6 @@
                 logout: signOut,
                 onAuthChange: onAuthStateChanged,
                 initAuth: async () => {
-                    // Critical: Prioritize Custom Token for Environment compatibility
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         try {
                             await signInWithCustomToken(auth, __initial_auth_token);
@@ -144,10 +144,8 @@
                             console.error("Token Auth Failed:", e);
                         }
                     } else {
-                        // Fallback: Running Locally
                         console.log("Running locally (No custom token found).");
                         if (!auth.currentUser) {
-                             // Attempt Anonymous login so local testing isn't blocked by auth
                              try {
                                  await signInAnonymously(auth);
                                  console.log("Signed in Anonymously for Local Testing");
@@ -162,6 +160,7 @@
                 doc,
                 addDoc,
                 setDoc,
+                updateDoc, 
                 deleteDoc,
                 onSnapshot,
                 query,
@@ -169,7 +168,6 @@
                 getDocs
             };
             
-            // Initialize immediately
             window.AppFirebase.initAuth();
             
         } catch (error) {
@@ -184,12 +182,9 @@
         const { useState, useEffect, useMemo, useRef } = React;
         
         // --- ADMIN CONFIGURATION ---
-        // 1. Run the app and check the Console.
-        // 2. Copy the "YOUR USER ID" string.
-        // 3. Paste it below to become the Admin.
         const ADMIN_UID = "gnaBtlCl1MW4eFzY3wyX1HMOZNu1"; 
 
-        // --- GLOBAL APP ID FOR FIRESTORE PATHS ---
+        // --- GLOBAL APP ID ---
         const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'auratest_clean_v2';
 
         // --- ICONS ---
@@ -229,6 +224,8 @@
             Layers: (p) => <Icon {...p} path={<><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>} />,
             RefreshCw: (p) => <Icon {...p} path={<><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>} />,
             Home: (p) => <Icon {...p} path={<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>} />,
+            Edit: (p) => <Icon {...p} path={<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>} />,
+            Save: (p) => <Icon {...p} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
         };
 
        
@@ -367,23 +364,32 @@
             const isAdmin = user && user.uid === ADMIN_UID;
             const [selectedFolderId, setSelectedFolderId] = useState('ALL');
 
+            // Sorting Helper
+            const sortFolders = (list) => {
+                return list.sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
+            }
+
             // Find current folder object
             const currentFolder = useMemo(() => folders.find(f => f.id === selectedFolderId), [folders, selectedFolderId]);
 
             // Filter subfolders (children of current selection)
             const subFolders = useMemo(() => {
                 if(selectedFolderId === 'ALL') return [];
-                return folders.filter(f => f.parentId === selectedFolderId);
+                const subs = folders.filter(f => f.parentId === selectedFolderId);
+                return sortFolders(subs);
             }, [folders, selectedFolderId]);
 
-            // Filter tests based on selected folder (Exact Match - Tests live in the specific folder/subfolder)
+            // Filter tests based on selected folder
             const filteredTests = useMemo(() => {
                 if (selectedFolderId === 'ALL') return tests;
                 return tests.filter(t => t.folderId === selectedFolderId);
             }, [tests, selectedFolderId]);
 
             // Root folders for sidebar (folders with no parent)
-            const rootFolders = useMemo(() => folders.filter(f => !f.parentId), [folders]);
+            const rootFolders = useMemo(() => {
+                const roots = folders.filter(f => !f.parentId);
+                return sortFolders(roots);
+            }, [folders]);
 
             // Breadcrumb Logic
             const breadcrumbs = useMemo(() => {
@@ -598,7 +604,7 @@
 
         // 2. ADMIN PANEL
         const AdminPanel = ({ onUpload, onCancel, onSuccess, folders, onCreateFolder, onDeleteFolder }) => {
-            const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'folders' | 'database'
+            const [activeTab, setActiveTab] = useState('upload'); 
             const [jsonInput, setJsonInput] = useState(''); 
             const [error, setError] = useState(null);
             const [isProcessing, setIsProcessing] = useState(false);
@@ -610,13 +616,17 @@
             
             // Folder Creation State
             const [newFolderName, setNewFolderName] = useState("");
-            const [parentFolderId, setParentFolderId] = useState(""); // For Subfolders
+            const [parentFolderId, setParentFolderId] = useState(""); 
             const [creatingFolder, setCreatingFolder] = useState(false);
+            const [folderOrder, setFolderOrder] = useState(0);
 
             // Database Explorer State
             const [dbDocs, setDbDocs] = useState([]);
             const [dbLoading, setDbLoading] = useState(false);
-            const [expandedDoc, setExpandedDoc] = useState(null);
+            const [editingDoc, setEditingDoc] = useState(null); // For Edit Modal
+
+            // Folder Management State
+            const [editingFolder, setEditingFolder] = useState(null); // For Folder Edit Modal
 
             const fileInputRef = useRef(null);
 
@@ -655,6 +665,31 @@
                 }
             };
 
+            const handleUpdateTest = async (docId, newData) => {
+                try {
+                    const { db, doc, updateDoc } = window.AppFirebase;
+                    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tests', docId), newData);
+                    
+                    // Update local state
+                    setDbDocs(prev => prev.map(d => d.id === docId ? { ...d, ...newData } : d));
+                    setEditingDoc(null);
+                    alert("Test updated successfully!");
+                } catch(e) {
+                    alert("Update failed: " + e.message);
+                }
+            };
+
+            const handleUpdateFolder = async (folderId, newData) => {
+                try {
+                    const { db, doc, updateDoc } = window.AppFirebase;
+                    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'folders', folderId), newData);
+                    setEditingFolder(null);
+                    // No need to update local state passed from props, Firestore listener in App will update it.
+                } catch(e) {
+                    alert("Folder Update Failed: " + e.message);
+                }
+            };
+
             const handleDeleteAll = async () => {
                 if(!window.confirm("DANGER: This will permanently delete ALL tests from the database. Are you absolutely sure?")) return;
                 
@@ -676,9 +711,10 @@
                 if(!newFolderName.trim()) return;
                 setCreatingFolder(true);
                 try {
-                    await onCreateFolder(newFolderName, parentFolderId || null); // Pass parentId
+                    await onCreateFolder(newFolderName, parentFolderId || null, parseInt(folderOrder)); 
                     setNewFolderName("");
                     setParentFolderId("");
+                    setFolderOrder(0);
                 } catch(e) {
                     alert("Failed to create folder: " + e.message);
                 } finally {
@@ -777,7 +813,6 @@
                 }
             };
 
-            // Recursive helper to get full path
             const getFullPath = (folderId) => {
                 let path = [];
                 let current = folders.find(f => f.id === folderId);
@@ -788,8 +823,143 @@
                 return path.length > 0 ? path.join(" > ") : "";
             }
 
+            // --- SUB-COMPONENTS FOR MODALS ---
+            const EditTestModal = ({ docData, onClose, onSave, allFolders }) => {
+                const [localJson, setLocalJson] = useState(JSON.stringify(docData, (key, value) => {
+                    if (key === 'id' || key === 'timestamp' || key === 'uploadedBy') return undefined; // Exclude system fields
+                    return value;
+                }, 2));
+                const [localFolderId, setLocalFolderId] = useState(docData.folderId || "");
+
+                const handleSave = () => {
+                    try {
+                        const parsed = JSON.parse(localJson);
+                        onSave(docData.id, { ...parsed, folderId: localFolderId });
+                    } catch(e) {
+                        alert("Invalid JSON: " + e.message);
+                    }
+                }
+
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                        <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+                            <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-white">Edit Test: {docData.title}</h3>
+                                <button onClick={onClose} className="text-slate-400 hover:text-white"><Icons.XCircle/></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Move to Folder</label>
+                                    <select 
+                                        value={localFolderId} 
+                                        onChange={(e) => setLocalFolderId(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                                    >
+                                        <option value="">-- No Folder (Root) --</option>
+                                        {allFolders.map(f => <option key={f.id} value={f.id}>{getFullPath(f.id)}</option>)}
+                                    </select>
+                                </div>
+                                <div className="flex-1 flex flex-col">
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Edit JSON Code (Questions, Time, etc.)</label>
+                                    <textarea 
+                                        value={localJson}
+                                        onChange={(e) => setLocalJson(e.target.value)}
+                                        className="w-full h-96 bg-slate-950 border border-slate-700 rounded-lg p-4 font-mono text-xs text-green-400 focus:outline-none focus:border-cyan-500"
+                                        spellCheck="false"
+                                    />
+                                </div>
+                            </div>
+                            <div className="p-4 border-t border-slate-800 flex justify-end gap-3">
+                                <button onClick={onClose} className="px-4 py-2 rounded-lg text-slate-400 hover:bg-slate-800">Cancel</button>
+                                <button onClick={handleSave} className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold flex items-center gap-2">
+                                    <Icons.Save size={16}/> Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const EditFolderModal = ({ folder, onClose, onSave, allFolders }) => {
+                const [name, setName] = useState(folder.name);
+                const [parentId, setParentId] = useState(folder.parentId || "");
+                const [order, setOrder] = useState(folder.order || 0);
+
+                return (
+                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                        <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md flex flex-col shadow-2xl">
+                            <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-white">Edit Folder</h3>
+                                <button onClick={onClose} className="text-slate-400 hover:text-white"><Icons.XCircle/></button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Folder Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={name} 
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Parent Folder</label>
+                                    <select 
+                                        value={parentId} 
+                                        onChange={(e) => setParentId(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                                    >
+                                        <option value="">-- No Parent (Root) --</option>
+                                        {allFolders.filter(f => f.id !== folder.id).map(f => (
+                                            <option key={f.id} value={f.id}>{getFullPath(f.id)}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Order Priority (Lower # shows first)</label>
+                                    <input 
+                                        type="number" 
+                                        value={order} 
+                                        onChange={(e) => setOrder(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                                    />
+                                    <p className="text-[10px] text-slate-500 mt-1">Example: Set Chapter 1 to order '1', Chapter 2 to order '2'.</p>
+                                </div>
+                            </div>
+                            <div className="p-4 border-t border-slate-800 flex justify-end gap-3">
+                                <button onClick={onClose} className="px-4 py-2 rounded-lg text-slate-400 hover:bg-slate-800">Cancel</button>
+                                <button 
+                                    onClick={() => onSave(folder.id, { name, parentId: parentId || null, order: parseInt(order) })} 
+                                    className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold flex items-center gap-2"
+                                >
+                                    <Icons.Save size={16}/> Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
             return (
                 <div className="min-h-screen bg-slate-950 text-white p-4 flex flex-col items-center justify-center font-sans">
+                    {/* MODALS */}
+                    {editingDoc && (
+                        <EditTestModal 
+                            docData={editingDoc} 
+                            allFolders={folders} 
+                            onClose={() => setEditingDoc(null)} 
+                            onSave={handleUpdateTest} 
+                        />
+                    )}
+                    {editingFolder && (
+                        <EditFolderModal 
+                            folder={editingFolder}
+                            allFolders={folders}
+                            onClose={() => setEditingFolder(null)}
+                            onSave={handleUpdateFolder}
+                        />
+                    )}
+
                     <div className="w-full max-w-5xl glass-card rounded-2xl p-8 shadow-2xl relative min-h-[600px] flex flex-col">
                         <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
                             <h2 className="text-2xl font-bold flex items-center gap-3 text-cyan-400">
@@ -952,26 +1122,37 @@
                                 <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 mb-8">
                                     <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2"><Icons.FolderPlus size={18}/> Create New Folder</h3>
                                     <div className="space-y-4">
-                                        <div>
-                                            <label className="text-xs text-slate-500 font-bold uppercase block mb-1">Folder Name</label>
-                                            <input 
-                                                type="text" 
-                                                value={newFolderName}
-                                                onChange={(e) => setNewFolderName(e.target.value)}
-                                                placeholder="e.g., Physics Mechanics, Full Mocks 2024"
-                                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
-                                            />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="col-span-2 md:col-span-1">
+                                                <label className="text-xs text-slate-500 font-bold uppercase block mb-1">Folder Name</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={newFolderName}
+                                                    onChange={(e) => setNewFolderName(e.target.value)}
+                                                    placeholder="e.g., Chapter 1"
+                                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                                                />
+                                            </div>
+                                            <div className="col-span-2 md:col-span-1">
+                                                <label className="text-xs text-slate-500 font-bold uppercase block mb-1">Order Priority</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={folderOrder}
+                                                    onChange={(e) => setFolderOrder(e.target.value)}
+                                                    placeholder="0"
+                                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                                                />
+                                            </div>
                                         </div>
                                         
                                         <div>
                                             <label className="text-xs text-slate-500 font-bold uppercase block mb-1">Parent Folder (Optional)</label>
                                             <select 
                                                 value={parentFolderId}
-                                                onChange={(e) => setParentFolderId(e.target.value)}
+                                                onChange={(e) => setParentId(e.target.value)}
                                                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
                                             >
                                                 <option value="">-- No Parent (Root Folder) --</option>
-                                                {/* MODIFIED: Show all folders with paths for deeper nesting support */}
                                                 {folders.map(f => (
                                                     <option key={f.id} value={f.id}>
                                                         {getFullPath(f.id)}
@@ -996,9 +1177,8 @@
                                         <p className="text-slate-500 italic">No folders created yet.</p>
                                     ) : (
                                         <div className="space-y-2">
-                                            {folders.map(folder => {
+                                            {[...folders].sort((a,b) => (a.order || 0) - (b.order || 0)).map(folder => {
                                                 const fullPath = getFullPath(folder.id);
-                                                // Extract just the parent path for display
                                                 const parts = fullPath.split(' > ');
                                                 const displayName = parts.pop();
                                                 const parentPath = parts.join(' > ');
@@ -1006,18 +1186,31 @@
                                                 return (
                                                     <div key={folder.id} className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-lg group hover:border-purple-500/50 transition-colors">
                                                         <div className="flex items-center gap-3">
+                                                            <div className="flex flex-col items-center justify-center w-8 h-8 rounded bg-slate-800 text-slate-500 font-mono text-xs border border-slate-700">
+                                                                {folder.order || 0}
+                                                            </div>
                                                             <Icons.Folder className={parentPath ? "text-cyan-400" : "text-purple-400"} />
                                                             <div>
                                                                 <span className="font-medium text-slate-200 block">{displayName}</span>
                                                                 {parentPath && <span className="text-[10px] text-slate-500 uppercase tracking-wide">Path: {parentPath}</span>}
                                                             </div>
                                                         </div>
-                                                        <button 
-                                                            onClick={() => { if(confirm('Delete this folder?')) onDeleteFolder(folder.id); }}
-                                                            className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                                                        >
-                                                            <Icons.Trash size={16} />
-                                                        </button>
+                                                        <div className="flex gap-2">
+                                                             <button 
+                                                                onClick={() => setEditingFolder(folder)}
+                                                                className="text-slate-600 hover:text-cyan-400 transition-colors p-2"
+                                                                title="Edit Order/Name"
+                                                            >
+                                                                <Icons.Edit size={16} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => { if(confirm('Delete this folder?')) onDeleteFolder(folder.id); }}
+                                                                className="text-slate-600 hover:text-red-400 transition-colors p-2"
+                                                                title="Delete"
+                                                            >
+                                                                <Icons.Trash size={16} />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
@@ -1035,13 +1228,13 @@
                                         <Icons.Database size={16} /> Firestore Records (Tests)
                                     </h3>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded hidden md:inline-block">Collection: artifacts/{APP_ID}/public/data/tests</span>
+                                        <span className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded hidden md:inline-block">Collection: tests</span>
                                         {dbDocs.length > 0 && (
                                             <button 
                                                 onClick={handleDeleteAll}
                                                 className="bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs px-3 py-1 rounded border border-red-500/30 flex items-center gap-1 transition-colors"
                                             >
-                                                <Icons.Trash size={12}/> Delete All Tests
+                                                <Icons.Trash size={12}/> Delete All
                                             </button>
                                         )}
                                     </div>
@@ -1083,11 +1276,11 @@
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <button 
-                                                                onClick={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
-                                                                className={`p-2 rounded hover:bg-slate-800 transition-colors ${expandedDoc === doc.id ? 'text-indigo-400' : 'text-slate-500'}`}
-                                                                title="View JSON"
+                                                                onClick={() => setEditingDoc(doc)}
+                                                                className="p-2 rounded hover:bg-slate-800 text-slate-500 hover:text-cyan-400 transition-colors"
+                                                                title="Edit / Move"
                                                             >
-                                                                <Icons.Eye size={16} />
+                                                                <Icons.Edit size={16} />
                                                             </button>
                                                             <button 
                                                                 onClick={() => handleDeleteDoc(doc.id)}
@@ -1098,16 +1291,6 @@
                                                             </button>
                                                         </div>
                                                     </div>
-                                                    
-                                                    {expandedDoc === doc.id && (
-                                                        <div className="mt-3 pt-3 border-t border-slate-800">
-                                                            <div className="relative">
-                                                                <pre className="text-[10px] font-mono text-indigo-300 bg-slate-950 p-3 rounded-lg overflow-x-auto custom-scrollbar">
-                                                                    {JSON.stringify(doc, null, 2)}
-                                                                </pre>
-                                                            </div>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -1134,7 +1317,7 @@
                 test.questions.filter(q => q.subject === selectedSubject), 
             [test.questions, selectedSubject]);
 
-            // Global index mapping: Find the actual index of the question in the global list to map Next/Prev correctly within subject
+            // Global index mapping
             const currentQuestion = subjectQuestions[currentQIndex];
 
             useEffect(() => {
@@ -1761,12 +1944,13 @@
                 }
             };
 
-            // MODIFIED: Create folder accepts ParentID
-            const handleCreateFolder = async (folderName, parentId = null) => {
+            // CREATE FOLDER
+            const handleCreateFolder = async (folderName, parentId = null, order = 0) => {
                 const { db, collection, addDoc } = window.AppFirebase;
                 await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'folders'), {
                     name: folderName,
                     parentId: parentId, // Store parent reference
+                    order: order,
                     createdAt: Date.now(),
                     createdBy: user.uid
                 });
