@@ -12,6 +12,12 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- PDF.js for Exam Extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    
     <script>
         tailwind.config = {
             theme: {
@@ -226,6 +232,7 @@
             Home: (p) => <Icon {...p} path={<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>} />,
             Edit: (p) => <Icon {...p} path={<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>} />,
             Save: (p) => <Icon {...p} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
+            Key: (p) => <Icon {...p} path={<><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>} />,
         };
 
        
@@ -235,6 +242,106 @@
             const s = seconds % 60;
             return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         };
+
+        // --- HELPER FUNCTIONS FOR AI EXTRACTION ---
+
+        async function convertPdfToImages(file, onProgress) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            const images = [];
+            const scale = 1.5; // Balance quality/size
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                if(onProgress) onProgress(i, pdf.numPages);
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: scale });
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                
+                // Base64 JPEG
+                const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                images.push(base64);
+            }
+            return images;
+        }
+
+        async function callGeminiAPI(apiKey, images) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const promptText = `
+                Act as a data extraction expert. I have uploaded images of an exam paper. 
+                Your task is to extract every single question and convert it into a strictly formatted JSON object.
+
+                JSON Structure Requirements:
+                {
+                  "title": "Title of the Exam",
+                  "duration": 180,
+                  "totalMarks": 300,
+                  "subjects": ["Mathematics", "Physics", "Chemistry"],
+                  "questions": [
+                    {
+                      "id": 1,
+                      "subject": "Mathematics",
+                      "type": "MCQ", 
+                      "text": "Question text here.",
+                      "options": ["Option A", "Option B", "Option C", "Option D"],
+                      "correct": 0
+                    }
+                  ]
+                }
+
+                Strict Formatting Rules:
+                1. Data Completeness: Extract ALL questions from all pages.
+                2. NO LaTeX Code: Do not use LaTeX syntax (no $, no \\, no ^, no _).
+                3. Visual Formatting using Unicode: You must use specific Unicode characters to represent math and science exactly as they appear visually:
+                   - Powers/Exponents: Use Unicode superscripts (e.g., x², 10⁻³).
+                   - Chemical Formulas: Use Unicode subscripts (e.g., H₂SO₄, C₆H₁₂O₆).
+                   - Math Symbols: Use actual symbols (π, φ, θ, ∞, ∫, ∆, √).
+                   - Functions: standard text (sin, log, cos).
+                   - Chemical Reactions: Use arrows (→, ⇌).
+                4. Diagrams: Write [IMAGE: Description] if a diagram exists.
+                5. Question Types: MCQ (Options A,B,C,D map to correct: 0,1,2,3). NUMERIC (Integer input).
+                6. Answer Key: If present, fill 'correct'. Else use 0 or null.
+                
+                Output ONLY the raw JSON object. No markdown code blocks.
+            `;
+
+            const parts = [{ text: promptText }];
+            images.forEach(imgData => {
+                parts.push({
+                    inlineData: {
+                        mimeType: "image/jpeg",
+                        data: imgData
+                    }
+                });
+            });
+
+            const payload = {
+                contents: [{ parts: parts }],
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error?.message || 'API Error');
+            }
+
+            const data = await response.json();
+            return JSON.parse(data.candidates[0].content.parts[0].text);
+        }
 
         // --- COMPONENTS ---
 
@@ -709,6 +816,10 @@
             const [statusText, setStatusText] = useState("Initializing...");
             const [selectedFolderId, setSelectedFolderId] = useState("");
             
+            // API Key State
+            const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
+            const [savingKey, setSavingKey] = useState(false);
+
             // Folder Creation State
             const [newFolderName, setNewFolderName] = useState("");
             const [parentFolderId, setParentFolderId] = useState(""); 
@@ -748,6 +859,12 @@
                     fetchDocs();
                 }
             }, [activeTab]);
+
+            const saveApiKey = () => {
+                localStorage.setItem('gemini_api_key', apiKey);
+                setSavingKey(true);
+                setTimeout(() => setSavingKey(false), 2000);
+            };
 
             const handleDeleteDoc = async (docId) => {
                 if(!window.confirm("Are you sure you want to permanently delete this test?")) return;
@@ -817,41 +934,45 @@
                 }
             }
 
-            const handleFileChange = (e) => {
+            const handleFileChange = async (e) => {
                 const file = e.target.files[0];
-                if (file && file.type === "application/pdf") {
-                    setFileName(file.name);
-                    setIsProcessing(true);
-                    
-                    setTimeout(() => {
-                        setIsProcessing(false);
-                        const templateData = {
-                            title: file.name.replace('.pdf', '') || "Uploaded Test",
-                            duration: 180, 
-                            totalMarks: 300,
-                            subjects: ["Physics", "Chemistry", "Mathematics"],
-                            questions: [
-                                { 
-                                    id: 1, 
-                                    subject: "Physics", 
-                                    type: "MCQ", 
-                                    text: "Paste Question 1 from PDF here...", 
-                                    options: ["Option A", "Option B", "Option C", "Option D"], 
-                                    correct: 0 
-                                },
-                                { 
-                                    id: 2, 
-                                    subject: "Chemistry", 
-                                    type: "NUMERIC", 
-                                    text: "Paste Question 2 from PDF here...", 
-                                    correct: 5 
-                                }
-                            ]
-                        };
-                        setJsonInput(JSON.stringify(templateData, null, 2));
-                    }, 1500);
-                } else {
+                if (!file || file.type !== "application/pdf") {
                     setError("Please upload a valid PDF file.");
+                    return;
+                }
+
+                if(!apiKey) {
+                    setError("Please enter your Gemini API Key first.");
+                    return;
+                }
+
+                setFileName(file.name);
+                setIsProcessing(true);
+                setError(null);
+                setJsonInput(''); // Clear previous input
+
+                try {
+                    // 1. Convert to Images
+                    setStatusText("Reading PDF Pages...");
+                    // Note: In real React, state updates are batched, so statusText might not show up if we don't break execution.
+                    // But here we rely on the async nature of convertPdfToImages
+                    const images = await convertPdfToImages(file, (curr, total) => {
+                        // Optional: Could update UI with page progress here
+                    });
+
+                    // 2. Call API
+                    setStatusText("Analysing with Gemini AI...");
+                    const extractedJson = await callGeminiAPI(apiKey, images);
+
+                    // 3. Set Output
+                    setJsonInput(JSON.stringify(extractedJson, null, 2));
+                    setStatusText("Extraction Complete!");
+                } catch (err) {
+                    console.error(err);
+                    setError(err.message || "Failed to extract data from PDF.");
+                    setJsonInput(`// Error during extraction: \n// ${err.message}`);
+                } finally {
+                    setIsProcessing(false);
                 }
             };
 
@@ -1089,11 +1210,33 @@
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
                                 {/* Left Side: Upload PDF */}
                                 <div className="md:col-span-1 space-y-4">
+                                    {/* API KEY INPUT */}
+                                    <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                                        <h3 className="font-bold text-slate-300 mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
+                                            <Icons.Key size={14} className="text-cyan-400"/> API Key
+                                        </h3>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="password"
+                                                value={apiKey}
+                                                onChange={(e) => setApiKey(e.target.value)}
+                                                placeholder="Gemini API Key"
+                                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                                            />
+                                            <button 
+                                                onClick={saveApiKey}
+                                                className="bg-slate-800 hover:bg-slate-700 text-white px-2 py-1 rounded text-xs border border-slate-700"
+                                            >
+                                                {savingKey ? <Icons.CheckCircle size={14} className="text-green-400"/> : "Save"}
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
                                         <h3 className="font-bold text-slate-300 mb-2 text-sm uppercase tracking-wider">Step 1: Upload Paper</h3>
                                         <div 
-                                            onClick={() => !uploading && fileInputRef.current.click()}
-                                            className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all text-center h-48 ${uploading ? 'border-slate-800 opacity-50 cursor-not-allowed' : 'border-slate-700 hover:border-cyan-500 hover:bg-slate-800/50 cursor-pointer'}`}
+                                            onClick={() => !uploading && !isProcessing && fileInputRef.current.click()}
+                                            className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center transition-all text-center h-48 ${uploading || isProcessing ? 'border-slate-800 opacity-50 cursor-not-allowed' : 'border-slate-700 hover:border-cyan-500 hover:bg-slate-800/50 cursor-pointer'}`}
                                         >
                                             <input 
                                                 type="file" 
@@ -1101,12 +1244,12 @@
                                                 ref={fileInputRef} 
                                                 className="hidden" 
                                                 onChange={handleFileChange}
-                                                disabled={uploading}
+                                                disabled={uploading || isProcessing}
                                             />
                                             {isProcessing ? (
                                                 <div className="flex flex-col items-center gap-3 text-cyan-400">
                                                     <Icons.Loader size={32} className="animate-spin" />
-                                                    <span className="text-xs font-mono">Initializing Template...</span>
+                                                    <span className="text-xs font-mono">{statusText || "Processing PDF..."}</span>
                                                 </div>
                                             ) : fileName ? (
                                                 <div className="flex flex-col items-center gap-3 text-green-400">
@@ -1130,7 +1273,7 @@
                                         <select 
                                             value={selectedFolderId}
                                             onChange={(e) => setSelectedFolderId(e.target.value)}
-                                            disabled={uploading}
+                                            disabled={uploading || isProcessing}
                                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
                                         >
                                             <option value="">-- No Folder (Root) --</option>
@@ -1148,9 +1291,9 @@
                                     <div className="flex flex-col mb-2">
                                         <div className="flex justify-between items-center">
                                             <h3 className="font-bold text-slate-300 text-sm uppercase tracking-wider">Step 3: JSON Structure</h3>
-                                            {jsonInput && <span className="text-[10px] text-green-400 bg-green-900/20 px-2 py-0.5 rounded">Template Ready</span>}
+                                            {jsonInput && !isProcessing && <span className="text-[10px] text-green-400 bg-green-900/20 px-2 py-0.5 rounded">Extraction Complete</span>}
                                         </div>
-                                        <p className="text-[11px] text-slate-500 mt-1">Review the data before publishing to the live server.</p>
+                                        <p className="text-[11px] text-slate-500 mt-1">AI will auto-extract questions. Verify before publishing.</p>
                                     </div>
                                     
                                     {uploading ? (
@@ -1183,7 +1326,7 @@
                                                 value={jsonInput}
                                                 onChange={(e) => setJsonInput(e.target.value)}
                                                 spellCheck="false"
-                                                placeholder="Upload a PDF to generate the test structure template..."
+                                                placeholder="Upload a PDF to auto-extract the test structure..."
                                                 disabled={isProcessing}
                                             />
                                             {!jsonInput && !isProcessing && (
@@ -1201,8 +1344,8 @@
                                             <button onClick={onCancel} className="px-6 py-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">Cancel</button>
                                             <button 
                                                 onClick={handleUpload} 
-                                                disabled={!jsonInput}
-                                                className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 shadow-lg transition-all transform active:scale-95 ${(!jsonInput) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-900/20'}`}
+                                                disabled={!jsonInput || isProcessing}
+                                                className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 shadow-lg transition-all transform active:scale-95 ${(!jsonInput || isProcessing) ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-900/20'}`}
                                             >
                                                 <Icons.CloudUpload size={18} /> Publish Test
                                             </button>
