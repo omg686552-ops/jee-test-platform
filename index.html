@@ -238,6 +238,117 @@
 
         // --- COMPONENTS ---
 
+        // Helper Component for Recursive Folder Tree
+        const FolderTree = ({ folders, selectedFolderId, onSelect, onEdit, onDelete, isAdmin }) => {
+            const getChildren = (parentId) => folders.filter(f => f.parentId === parentId).sort((a,b) => (a.order || 0) - (b.order || 0));
+
+            const FolderNode = ({ folder, level }) => {
+                const [expanded, setExpanded] = useState(false);
+                const children = getChildren(folder.id);
+                const hasChildren = children.length > 0;
+
+                const handleExpand = (e) => {
+                    e.stopPropagation();
+                    setExpanded(!expanded);
+                };
+
+                const handleClick = () => {
+                    if (onSelect) onSelect(folder.id);
+                };
+
+                // Styling logic based on usage (Admin vs Dashboard)
+                const containerClass = isAdmin 
+                    ? `flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-lg group hover:border-purple-500/50 transition-colors mb-1`
+                    : `w-full text-left px-3 md:px-4 py-3 rounded-xl transition-all flex items-center justify-between group ${selectedFolderId === folder.id 
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20 border border-indigo-500/50' 
+                        : 'hover:bg-slate-800 text-slate-400 hover:text-white border border-transparent'}`;
+
+                const textClass = isAdmin 
+                    ? "font-medium text-slate-200 block truncate"
+                    : "hidden md:block truncate text-sm font-semibold";
+
+                return (
+                    <div className="select-none">
+                        <div 
+                            className={containerClass}
+                            style={{ marginLeft: isAdmin ? `${level * 24}px` : `${level * 12}px` }}
+                            onClick={handleClick}
+                        >
+                            <div className="flex items-center gap-3 overflow-hidden">
+                                {/* Expand Button - Visible only if has children */}
+                                <div 
+                                    onClick={handleExpand}
+                                    className={`p-1 rounded hover:bg-white/10 cursor-pointer transition-transform ${hasChildren ? 'visible' : 'invisible'}`}
+                                >
+                                    {expanded ? <Icons.ChevronDown size={14}/> : <Icons.ChevronRight size={14}/>}
+                                </div>
+
+                                <div className={`flex items-center gap-3 flex-1 overflow-hidden`}>
+                                    {/* Icon Box */}
+                                    {isAdmin ? (
+                                        <div className="flex flex-col items-center justify-center w-8 h-8 rounded bg-slate-800 text-slate-500 font-mono text-xs border border-slate-700">
+                                            {folder.order || 0}
+                                        </div>
+                                    ) : (
+                                        <div className={`p-1.5 rounded-lg ${selectedFolderId === folder.id ? 'bg-white/20' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
+                                            <Icons.Folder size={16} />
+                                        </div>
+                                    )}
+                                    
+                                    <div className={isAdmin ? "" : "hidden md:block overflow-hidden"}>
+                                        <span className={textClass}>{folder.name}</span>
+                                        {!isAdmin && <div className="text-[10px] opacity-70">Folder</div>}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Admin Actions */}
+                            {isAdmin && (
+                                <div className="flex gap-2">
+                                     <button 
+                                        onClick={(e) => { e.stopPropagation(); onEdit(folder); }}
+                                        className="text-slate-600 hover:text-cyan-400 transition-colors p-2"
+                                        title="Edit Order/Name"
+                                    >
+                                        <Icons.Edit size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); if(confirm('Delete this folder?')) onDelete(folder.id); }}
+                                        className="text-slate-600 hover:text-red-400 transition-colors p-2"
+                                        title="Delete"
+                                    >
+                                        <Icons.Trash size={16} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Children */}
+                        {expanded && hasChildren && (
+                            <div className={isAdmin ? "mt-1" : ""}>
+                                {children.map(child => (
+                                    <FolderNode key={child.id} folder={child} level={level + 1} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            // Render Roots
+            // Check for both null and undefined/empty string
+            const roots = folders.filter(f => !f.parentId).sort((a,b) => (a.order || 0) - (b.order || 0));
+
+            return (
+                <div className="space-y-1">
+                    {roots.length === 0 && <p className="text-slate-500 italic p-2 text-xs">No folders found.</p>}
+                    {roots.map(root => (
+                        <FolderNode key={root.id} folder={root} level={0} />
+                    ))}
+                </div>
+            )
+        };
+
         // 0. LOGIN COMPONENT
         const Login = ({ onLoginSuccess }) => {
             const [isLogin, setIsLogin] = useState(true);
@@ -385,12 +496,6 @@
                 return tests.filter(t => t.folderId === selectedFolderId);
             }, [tests, selectedFolderId]);
 
-            // Root folders for sidebar (folders with no parent)
-            const rootFolders = useMemo(() => {
-                const roots = folders.filter(f => !f.parentId);
-                return sortFolders(roots);
-            }, [folders]);
-
             // Breadcrumb Logic
             const breadcrumbs = useMemo(() => {
                 if(selectedFolderId === 'ALL') return [{ id: 'ALL', name: 'Home' }];
@@ -471,23 +576,13 @@
                                     </div>
                                 </button>
 
-                                {rootFolders.map(folder => (
-                                    <button 
-                                        key={folder.id}
-                                        onClick={() => setSelectedFolderId(folder.id)}
-                                        className={`w-full text-left px-3 md:px-4 py-3 rounded-xl transition-all flex items-center gap-3 group ${breadcrumbs.some(b => b.id === folder.id)
-                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20 border border-indigo-500/50' 
-                                            : 'hover:bg-slate-800 text-slate-400 hover:text-white border border-transparent'}`}
-                                    >
-                                        <div className={`p-1.5 rounded-lg ${breadcrumbs.some(b => b.id === folder.id) ? 'bg-white/20' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
-                                            <Icons.Folder size={16} />
-                                        </div>
-                                        <div className="hidden md:block truncate">
-                                            <div className="text-sm font-semibold truncate">{folder.name}</div>
-                                            <div className="text-[10px] opacity-70">Folder</div>
-                                        </div>
-                                    </button>
-                                ))}
+                                {/* UPDATED: Tree View for Sidebar */}
+                                <FolderTree 
+                                    folders={folders} 
+                                    selectedFolderId={selectedFolderId} 
+                                    onSelect={handleFolderClick}
+                                    isAdmin={false}
+                                />
                              </div>
                         </aside>
 
@@ -1173,49 +1268,15 @@
 
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                                     <h3 className="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3">Existing Folders</h3>
-                                    {folders.length === 0 ? (
-                                        <p className="text-slate-500 italic">No folders created yet.</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {[...folders].sort((a,b) => (a.order || 0) - (b.order || 0)).map(folder => {
-                                                const fullPath = getFullPath(folder.id);
-                                                const parts = fullPath.split(' > ');
-                                                const displayName = parts.pop();
-                                                const parentPath = parts.join(' > ');
-
-                                                return (
-                                                    <div key={folder.id} className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-lg group hover:border-purple-500/50 transition-colors">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="flex flex-col items-center justify-center w-8 h-8 rounded bg-slate-800 text-slate-500 font-mono text-xs border border-slate-700">
-                                                                {folder.order || 0}
-                                                            </div>
-                                                            <Icons.Folder className={parentPath ? "text-cyan-400" : "text-purple-400"} />
-                                                            <div>
-                                                                <span className="font-medium text-slate-200 block">{displayName}</span>
-                                                                {parentPath && <span className="text-[10px] text-slate-500 uppercase tracking-wide">Path: {parentPath}</span>}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                             <button 
-                                                                onClick={() => setEditingFolder(folder)}
-                                                                className="text-slate-600 hover:text-cyan-400 transition-colors p-2"
-                                                                title="Edit Order/Name"
-                                                            >
-                                                                <Icons.Edit size={16} />
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => { if(confirm('Delete this folder?')) onDeleteFolder(folder.id); }}
-                                                                className="text-slate-600 hover:text-red-400 transition-colors p-2"
-                                                                title="Delete"
-                                                            >
-                                                                <Icons.Trash size={16} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
+                                    
+                                    {/* UPDATED: Tree View for Admin Panel */}
+                                    <FolderTree 
+                                        folders={folders} 
+                                        isAdmin={true} 
+                                        onEdit={setEditingFolder} 
+                                        onDelete={onDeleteFolder} 
+                                    />
+                                    
                                 </div>
                             </div>
                         )}
@@ -2043,4 +2104,3 @@
     </script>
 </body>
 </html>
-
